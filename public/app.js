@@ -8,7 +8,7 @@ const fPlate = () => document.getElementById("fPlate");
 const fPass = () => document.getElementById("fPass");
 
 
-let token = "";
+let token = localStorage.getItem("admin_token") || "";
 let map = null;
 let markers = {};
 
@@ -46,6 +46,8 @@ async function login() {
     }
 
     token = data.token;
+
+    localStorage.setItem("admin_token", token);
 
     loginEl.style.display = "none";
     panelEl.style.display = "grid";
