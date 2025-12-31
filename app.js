@@ -1,4 +1,4 @@
-const API = "https://SEU-RENDER.onrender.com";
+const API = "https://moovtk.onrender.com";
 let token = "";
 
 async function login(){
@@ -13,7 +13,7 @@ async function login(){
   const j = await r.json();
   if(j.token){
     token = j.token;
-    loginDiv.style.display="none";
+    login.style.display="none";
     app.style.display="block";
     loadTrips();
     startStream();
@@ -49,9 +49,7 @@ async function loadTrips(){
 }
 
 function startStream(){
-  const ev = new EventSource(API+"/admin/stream",{
-    headers:{Authorization:"Bearer "+token}
-  });
+  const ev = new EventSource(API+"/admin/stream?token="+token);
   ev.onmessage = e => {
     const d = JSON.parse(e.data);
     if(d.live[0]){
