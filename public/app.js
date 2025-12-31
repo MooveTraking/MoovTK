@@ -1,3 +1,9 @@
+const email = document.getElementById("email");
+const password = document.getElementById("password");
+const msg = document.getElementById("msg");
+const vehicles = document.getElementById("vehicles");
+const count = document.getElementById("count");
+const clock = document.getElementById("clock");
 const API = "https://moovtk.onrender.com";
 let token = "";
 let map;
@@ -11,8 +17,8 @@ function login(){
   }).then(r=>r.json()).then(j=>{
     if(j.token){
       token=j.token;
-      login.style.display="none";
-      panel.style.display="grid";
+      document.getElementById("login").style.display="none";
+      document.getElementById("panel").style.display="grid";
       initMap();
       startStream();
     } else msg.innerText=j.error;
