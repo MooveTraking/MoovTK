@@ -1,8 +1,8 @@
 package com.moove.tk
 
 import android.Manifest
+import android.content.Context
 import android.content.Intent
-import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
@@ -21,203 +21,207 @@ import org.json.JSONObject
 class MainActivity : AppCompatActivity() {
 
     private val API = "https://moovtk.onrender.com"
-    private val client = OkHttpClient()
-    private lateinit var prefs: SharedPreferences
 
-    private lateinit var etCpf: EditText
-    private lateinit var etSenha: EditText
-    private lateinit var btnEntrar: Button
-    private lateinit var btnIniciar: Button
-    private lateinit var btnFinalizar: Button
-    private lateinit var tvStatus: TextView
+    private val http = OkHttpClient()
 
-    private var token: String? = null
-    private var tripId: String? = null
+    private lateinit var inCpf: EditText
+    private lateinit var inPass: EditText
+    private lateinit var btnLogin: Button
+    private lateinit var btnStart: Button
+    private lateinit var btnFinish: Button
+    private lateinit var tUser: TextView
+    private lateinit var tStatus: TextView
+
+    private val prefs by lazy { getSharedPreferences("moovtk", Context.MODE_PRIVATE) }
+
+    private fun setStatus(s: String) { runOnUiThread { tStatus.text = "Status: $s" } }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        prefs = getSharedPreferences("moove", MODE_PRIVATE)
-        token = prefs.getString("token", null)
-        tripId = prefs.getString("tripId", null)
+        inCpf = findViewById(R.id.inCpf)
+        inPass = findViewById(R.id.inPass)
+        btnLogin = findViewById(R.id.btnLogin)
+        btnStart = findViewById(R.id.btnStart)
+        btnFinish = findViewById(R.id.btnFinish)
+        tUser = findViewById(R.id.tUser)
+        tStatus = findViewById(R.id.tStatus)
 
-        etCpf = findViewById(R.id.etCpf)
-        etSenha = findViewById(R.id.etSenha)
-        btnEntrar = findViewById(R.id.btnEntrar)
-        btnIniciar = findViewById(R.id.btnIniciar)
-        btnFinalizar = findViewById(R.id.btnFinalizar)
-        tvStatus = findViewById(R.id.tvStatus)
+        btnLogin.setOnClickListener { doLogin() }
+        btnStart.setOnClickListener { startTrip() }
+        btnFinish.setOnClickListener { finishTrip() }
 
-        requestPerms()
+        refreshUi()
+        ensureLocationPermission()
+    }
 
-        updateUi()
+    private fun refreshUi() {
+        val token = prefs.getString("driver_token", "") ?: ""
+        val name = prefs.getString("driver_name", "") ?: ""
+        val plate = prefs.getString("driver_plate", "") ?: ""
+        val tripId = prefs.getString("trip_id", "") ?: ""
 
-        btnEntrar.setOnClickListener {
-            login(etCpf.text.toString().trim(), etSenha.text.toString().trim())
-        }
-
-        btnIniciar.setOnClickListener {
-            startTrip()
-        }
-
-        btnFinalizar.setOnClickListener {
-            finishTrip()
+        if (token.isNotBlank()) {
+            tUser.text = "Logado: $name · $plate"
+            btnStart.isEnabled = tripId.isBlank()
+            btnFinish.isEnabled = tripId.isNotBlank()
+        } else {
+            tUser.text = "Não logado"
+            btnStart.isEnabled = false
+            btnFinish.isEnabled = false
         }
     }
 
-    private fun requestPerms() {
-        val perms = mutableListOf(
+    private fun ensureLocationPermission() {
+        val needed = arrayOf(
             Manifest.permission.ACCESS_FINE_LOCATION,
             Manifest.permission.ACCESS_COARSE_LOCATION
         )
-        if (Build.VERSION.SDK_INT >= 28) perms.add(Manifest.permission.FOREGROUND_SERVICE)
 
-        val missing = perms.filter {
+        val missing = needed.any {
             ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED
         }
 
-        if (missing.isNotEmpty()) {
-            ActivityCompat.requestPermissions(this, missing.toTypedArray(), 101)
+        if (missing) {
+            ActivityCompat.requestPermissions(this, needed, 101)
         }
     }
 
-    private fun updateUi() {
-        val logged = token != null
-        val active = tripId != null
-
-        btnIniciar.isEnabled = logged && !active
-        btnFinalizar.isEnabled = logged && active
-
-        tvStatus.text = when {
-            token == null -> "Status: Desconectado"
-            tripId == null -> "Status: Logado (sem viagem)"
-            else -> "Status: Em viagem (enviando GPS)"
-        }
-    }
-
-    private fun login(cpf: String, senha: String) {
-        if (cpf.isEmpty() || senha.isEmpty()) {
-            tvStatus.text = "Status: Informe CPF e senha"
+    private fun doLogin() {
+        val cpf = inCpf.text.toString().trim()
+        val pass = inPass.text.toString().trim()
+        if (cpf.isBlank() || pass.isBlank()) {
+            setStatus("Preencha CPF e senha")
             return
         }
 
+        setStatus("Logando...")
+
         Thread {
             try {
-                val json = JSONObject()
-                json.put("identifier", cpf)
-                json.put("password", senha)
+                val payload = JSONObject()
+                payload.put("identifier", cpf)
+                payload.put("password", pass)
 
-                val body = json.toString().toRequestBody("application/json".toMediaType())
+                val body = payload.toString().toRequestBody("application/json".toMediaType())
+
                 val req = Request.Builder()
                     .url("$API/driver/login")
                     .post(body)
                     .build()
 
-                val resp = client.newCall(req).execute()
-                val text = resp.body?.string() ?: ""
+                val resp = http.newCall(req).execute()
+                val txt = resp.body?.string() ?: ""
 
-                runOnUiThread {
-                    if (!resp.isSuccessful) {
-                        tvStatus.text = "Status: Login falhou"
-                        return@runOnUiThread
-                    }
-
-                    val data = JSONObject(text)
-                    token = data.getString("token")
-                    prefs.edit().putString("token", token).apply()
-
-                    tvStatus.text = "Status: Logado (sem viagem)"
-                    updateUi()
+                if (!resp.isSuccessful) {
+                    setStatus("Falha login: $txt")
+                    return@Thread
                 }
+
+                val json = JSONObject(txt)
+                val token = json.getString("token")
+                val driver = json.getJSONObject("driver")
+                val name = driver.getString("name")
+                val plate = driver.getString("plate")
+
+                prefs.edit()
+                    .putString("driver_token", token)
+                    .putString("driver_name", name)
+                    .putString("driver_plate", plate)
+                    .apply()
+
+                setStatus("Logado")
+                runOnUiThread { refreshUi() }
 
             } catch (e: Exception) {
-                runOnUiThread {
-                    tvStatus.text = "Status: Erro no login"
-                }
+                setStatus("Erro: ${e.message}")
             }
         }.start()
     }
 
     private fun startTrip() {
-        val t = token ?: return
+        val token = prefs.getString("driver_token", "") ?: ""
+        if (token.isBlank()) { setStatus("Faça login"); return }
+
+        setStatus("Iniciando viagem...")
 
         Thread {
             try {
                 val req = Request.Builder()
                     .url("$API/trip/start")
                     .post("{}".toRequestBody("application/json".toMediaType()))
-                    .addHeader("Authorization", "Bearer $t")
-                    .addHeader("Content-Type", "application/json")
+                    .addHeader("Authorization", "Bearer $token")
                     .build()
 
-                val resp = client.newCall(req).execute()
-                val text = resp.body?.string() ?: ""
+                val resp = http.newCall(req).execute()
+                val txt = resp.body?.string() ?: ""
 
-                runOnUiThread {
-                    if (!resp.isSuccessful) {
-                        tvStatus.text = "Status: Falha ao iniciar"
-                        return@runOnUiThread
-                    }
-
-                    val data = JSONObject(text)
-                    tripId = data.getString("trip_id")
-                    prefs.edit().putString("tripId", tripId).apply()
-
-                    startService()
-                    updateUi()
+                if (!resp.isSuccessful) {
+                    setStatus("Falha start: $txt")
+                    return@Thread
                 }
 
+                val tripId = JSONObject(txt).getString("trip_id")
+
+                prefs.edit().putString("trip_id", tripId).apply()
+
+                val it = Intent(this, TrackingService::class.java)
+                it.putExtra("API", API)
+                it.putExtra("TOKEN", token)
+                it.putExtra("TRIP_ID", tripId)
+
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    startForegroundService(it)
+                } else {
+                    startService(it)
+                }
+
+                setStatus("Viagem ativa: $tripId")
+                runOnUiThread { refreshUi() }
+
             } catch (e: Exception) {
-                runOnUiThread { tvStatus.text = "Status: Erro ao iniciar" }
+                setStatus("Erro: ${e.message}")
             }
         }.start()
     }
 
     private fun finishTrip() {
-        val t = token ?: return
-        val trip = tripId ?: return
+        val token = prefs.getString("driver_token", "") ?: ""
+        val tripId = prefs.getString("trip_id", "") ?: ""
+        if (token.isBlank()) { setStatus("Faça login"); return }
+        if (tripId.isBlank()) { setStatus("Nenhuma viagem ativa"); return }
+
+        setStatus("Finalizando viagem...")
 
         Thread {
             try {
-                val json = JSONObject()
-                json.put("trip_id", trip)
+                val payload = JSONObject()
+                payload.put("trip_id", tripId)
 
-                val body = json.toString().toRequestBody("application/json".toMediaType())
                 val req = Request.Builder()
                     .url("$API/trip/finish")
-                    .post(body)
-                    .addHeader("Authorization", "Bearer $t")
-                    .addHeader("Content-Type", "application/json")
+                    .post(payload.toString().toRequestBody("application/json".toMediaType()))
+                    .addHeader("Authorization", "Bearer $token")
                     .build()
 
-                val resp = client.newCall(req).execute()
+                val resp = http.newCall(req).execute()
+                val txt = resp.body?.string() ?: ""
 
-                runOnUiThread {
-                    if (!resp.isSuccessful) {
-                        tvStatus.text = "Status: Falha ao finalizar"
-                        return@runOnUiThread
-                    }
-
-                    stopService()
-                    tripId = null
-                    prefs.edit().remove("tripId").apply()
-
-                    updateUi()
+                if (!resp.isSuccessful) {
+                    setStatus("Falha finish: $txt")
+                    return@Thread
                 }
 
+                stopService(Intent(this, TrackingService::class.java))
+                prefs.edit().remove("trip_id").apply()
+
+                setStatus("Viagem finalizada")
+                runOnUiThread { refreshUi() }
+
             } catch (e: Exception) {
-                runOnUiThread { tvStatus.text = "Status: Erro ao finalizar" }
+                setStatus("Erro: ${e.message}")
             }
         }.start()
-    }
-
-    private fun startService() {
-        val intent = Intent(this, TrackingService::class.java)
-        ContextCompat.startForegroundService(this, intent)
-    }
-
-    private fun stopService() {
-        stopService(Intent(this, TrackingService::class.java))
     }
 }
