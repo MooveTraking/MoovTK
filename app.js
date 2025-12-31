@@ -1,59 +1,47 @@
 const API = "https://moovtk.onrender.com";
 let token = "";
+let map;
+let markers = {};
 
-async function login(){
-  const r = await fetch(API+"/admin/login",{
+function login(){
+  fetch(API+"/admin/login",{
     method:"POST",
     headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({
-      email:email.value,
-      password:password.value
-    })
-  });
-  const j = await r.json();
-  if(j.token){
-    token = j.token;
-    login.style.display="none";
-    app.style.display="block";
-    loadTrips();
-    startStream();
-  } else msg.innerText = j.error;
-}
-
-async function createDriver(){
-  await fetch(API+"/admin/drivers",{
-    method:"POST",
-    headers:{
-      "Content-Type":"application/json",
-      "Authorization":"Bearer "+token
-    },
-    body:JSON.stringify({
-      cpf:cpf.value,
-      name:name.value,
-      plate:plate.value,
-      phone:phone.value,
-      password:pass.value
-    })
+    body:JSON.stringify({email:email.value,password:password.value})
+  }).then(r=>r.json()).then(j=>{
+    if(j.token){
+      token=j.token;
+      login.style.display="none";
+      panel.style.display="grid";
+      initMap();
+      startStream();
+    } else msg.innerText=j.error;
   });
 }
 
-async function loadTrips(){
-  const r = await fetch(API+"/admin/trips?status=active",{
-    headers:{Authorization:"Bearer "+token}
-  });
-  const j = await r.json();
-  trips.innerHTML = "<tr><th>Motorista</th><th>Placa</th></tr>";
-  j.trips.forEach(t=>{
-    trips.innerHTML+=`<tr><td>${t.driver_name}</td><td>${t.plate}</td></tr>`;
-  });
+function initMap(){
+  map = L.map("map").setView([-27.6,-48.5],7);
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(map);
 }
 
 function startStream(){
   const ev = new EventSource(API+"/admin/stream?token="+token);
-  ev.onmessage = e => {
-    const d = JSON.parse(e.data);
-    if(d.live[0]){
-      map.src=`https://maps.google.com/maps?q=${d.live[0].lat},${d.live[0].lng}&z=10&output=embed`;
-    }
-  }
+  ev.onmessage = e=>{
+    const data = JSON.parse(e.data);
+    vehicles.innerHTML="";
+    count.innerText=data.live.length;
+
+    data.live.forEach(v=>{
+      vehicles.innerHTML+=`<div class="vehicle">${v.plate}<br><small>${v.driver_name}</small></div>`;
+      if(v.lat){
+        if(!markers[v.trip_id]){
+          markers[v.trip_id]=L.marker([v.lat,v.lng]).addTo(map);
+        } else {
+          markers[v.trip_id].setLatLng([v.lat,v.lng]);
+        }
+      }
+    });
+  };
 }
+
+setInterval(()=>clock.innerText=new Date().toLocaleTimeString(),1000);
