@@ -1,5 +1,7 @@
 const API = "https://moovtk.onrender.com";
 
+console.log("APP LOADED");
+
 const fCpf = () => document.getElementById("fCpf");
 const fName = () => document.getElementById("fName");
 const fPlate = () => document.getElementById("fPlate");
@@ -107,7 +109,9 @@ document.getElementById("btnAdd").onclick = () => {
 document.getElementById("btnSaveDriver").addEventListener("click", createDriver);
 
 async function createDriver() {
+  console.log("CLICKED");
   try {
+
     const cpf = fCpf().value.trim();
     const name = fName().value.trim();
     const plate = fPlate().value.trim();
