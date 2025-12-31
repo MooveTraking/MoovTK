@@ -22,6 +22,16 @@
 
 <div id="panel" style="display:none">
   <div class="sidebar">
+      <button id="btnAdd" class="add-btn">+ Novo Motorista</button>
+
+   <div id="driverForm" class="form" style="display:none">
+      <input id="fCpf" placeholder="CPF">
+      <input id="fName" placeholder="Nome">
+      <input id="fPlate" placeholder="Placa">
+      <input id="fPass" type="password" placeholder="Senha">
+      <button onclick="createDriver()">Salvar</button>
+  </div>
+
     <h2>Veículos Ativos</h2>
     <div id="vehicles"></div>
   </div>
