@@ -10,6 +10,7 @@ const jwt = require("jsonwebtoken");
 const { q } = require("./db");
 
 const app = express();
+app.use(express.static(path.join(__dirname, "public")));
 app.use(express.json({ limit: "1mb" }));
 
 const CORS_ORIGIN = process.env.CORS_ORIGIN || "*";
@@ -454,6 +455,11 @@ app.get("/admin/stream", authAdmin, async (req, res) => {
 
   send();
 });
+
+app.get("/app", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "index.html"));
+});
+
 
 // =========================
 // BOOT
