@@ -13,7 +13,19 @@ const app = express();
 app.use(express.json({ limit: "1mb" }));
 
 const CORS_ORIGIN = process.env.CORS_ORIGIN || "*";
-app.use(cors({ origin: CORS_ORIGIN === "*" ? true : CORS_ORIGIN }));
+app.use(cors({
+  origin: true,
+  credentials: true
+}));
+
+app.use((req, res, next) => {
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Headers", "*");
+  res.setHeader("Access-Control-Allow-Methods", "*");
+  next();
+});
+
+
 
 const PORT = process.env.PORT || 10000;
 const JWT_SECRET = process.env.JWT_SECRET || "change-me";
