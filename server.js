@@ -1,34 +1,37 @@
-import "dotenv/config";
-import express from "express";
-import cors from "cors";
-import bcrypt from "bcryptjs";
-import jwt from "jsonwebtoken";
-import { v4 as uuidv4 } from "uuid";
-import { pool } from "./db.js";
-import { WebSocketServer } from "ws";
+require("dotenv").config();
+
+const fs = require("fs");
+const path = require("path");
+const express = require("express");
+const cors = require("cors");
+const bcrypt = require("bcryptjs");
+const jwt = require("jsonwebtoken");
+
+const { q } = require("./db");
 
 const app = express();
 app.use(express.json({ limit: "1mb" }));
 
-const corsOrigin = process.env.CORS_ORIGIN || "*";
-app.use(cors({ origin: corsOrigin, credentials: false }));
+const CORS_ORIGIN = process.env.CORS_ORIGIN || "*";
+app.use(cors({ origin: CORS_ORIGIN === "*" ? true : CORS_ORIGIN }));
 
-const JWT_SECRET = process.env.JWT_SECRET || "CHANGE_ME";
+const PORT = process.env.PORT || 10000;
+const JWT_SECRET = process.env.JWT_SECRET || "change-me";
 
-function signToken(payload) {
-  return jwt.sign(payload, JWT_SECRET, { expiresIn: "30d" });
+function signToken(payload, expiresIn) {
+  return jwt.sign(payload, JWT_SECRET, { expiresIn });
 }
 
 function authDriver(req, res, next) {
   const h = req.headers.authorization || "";
   const token = h.startsWith("Bearer ") ? h.slice(7) : "";
-  if (!token) return res.status(401).json({ error: "Sem token." });
+  if (!token) return res.status(401).json({ error: "Token ausente." });
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
     if (decoded.type !== "driver") return res.status(403).json({ error: "Token inválido." });
     req.driver = decoded;
-    next();
-  } catch {
+    return next();
+  } catch (e) {
     return res.status(401).json({ error: "Token inválido/expirado." });
   }
 }
@@ -36,295 +39,420 @@ function authDriver(req, res, next) {
 function authAdmin(req, res, next) {
   const h = req.headers.authorization || "";
   const token = h.startsWith("Bearer ") ? h.slice(7) : "";
-  if (!token) return res.status(401).json({ error: "Sem token." });
+  if (!token) return res.status(401).json({ error: "Token ausente." });
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
     if (decoded.type !== "admin") return res.status(403).json({ error: "Token inválido." });
     req.admin = decoded;
-    next();
-  } catch {
+    return next();
+  } catch (e) {
     return res.status(401).json({ error: "Token inválido/expirado." });
   }
 }
 
-async function bootstrapAdmin() {
-  const email = process.env.ADMIN_BOOTSTRAP_EMAIL;
-  const pass = process.env.ADMIN_BOOTSTRAP_PASSWORD;
-  if (!email || !pass) return;
+async function ensureSchema() {
+  const schemaPath = path.join(__dirname, "schema.sql");
+  const sql = fs.readFileSync(schemaPath, "utf8");
+  await q(sql);
+}
 
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS admins (
-      id SERIAL PRIMARY KEY,
-      name TEXT NOT NULL,
-      email TEXT UNIQUE NOT NULL,
-      password_hash TEXT NOT NULL,
-      created_at TIMESTAMP NOT NULL DEFAULT NOW()
-    );
-  `);
+async function ensureBootstrapAdmin() {
+  const email = (process.env.ADMIN_BOOTSTRAP_EMAIL || "").trim().toLowerCase();
+  const pass = (process.env.ADMIN_BOOTSTRAP_PASSWORD || "").trim();
 
-  const r = await pool.query("SELECT id FROM admins WHERE email=$1", [email]);
-  if (r.rowCount > 0) return;
+  if (!email || !pass) {
+    console.log("BOOTSTRAP ADMIN não configurado (ADMIN_BOOTSTRAP_EMAIL/PASSWORD).");
+    return;
+  }
+
+  const exists = await q("SELECT id FROM admins WHERE email=$1", [email]);
+  if (exists.rowCount > 0) return;
 
   const hash = await bcrypt.hash(pass, 10);
-  await pool.query(
-    "INSERT INTO admins (name,email,password_hash) VALUES ($1,$2,$3)",
-    ["Admin", email, hash]
-  );
-  console.log("ADMIN bootstrap criado:", email);
+  await q("INSERT INTO admins (email, password_hash) VALUES ($1,$2)", [email, hash]);
+  console.log("Admin bootstrap criado:", email);
 }
 
-// =========================
-// WebSocket Broadcast
-// =========================
-const server = app.listen(process.env.PORT || 3000, async () => {
-  console.log("API online");
-  await bootstrapAdmin();
-});
-
-const wss = new WebSocketServer({ server });
-const wsClients = new Set();
-
-wss.on("connection", (ws) => {
-  wsClients.add(ws);
-  ws.on("close", () => wsClients.delete(ws));
-});
-
-function broadcast(event, payload) {
-  const msg = JSON.stringify({ event, payload });
-  for (const c of wsClients) {
-    try { c.send(msg); } catch {}
-  }
-}
-
-// =========================
-// Health
-// =========================
 app.get("/", (req, res) => res.json({ ok: true, name: "Moove Tracking API" }));
+app.get("/health", (req, res) => res.json({ ok: true }));
 
 // =========================
-// Admin Auth
+// ADMIN AUTH
 // =========================
 app.post("/admin/login", async (req, res) => {
-  const { email, password } = req.body || {};
-  if (!email || !password) return res.status(400).json({ error: "Dados ausentes." });
+  try {
+    const { email, password } = req.body || {};
+    const e = (email || "").trim().toLowerCase();
+    const p = (password || "").trim();
 
-  const r = await pool.query("SELECT id, name, email, password_hash FROM admins WHERE email=$1", [String(email).toLowerCase()]);
-  if (r.rowCount === 0) return res.status(401).json({ error: "Credenciais inválidas." });
+    if (!e || !p) return res.status(400).json({ error: "Email e senha obrigatórios." });
 
-  const admin = r.rows[0];
-  const ok = await bcrypt.compare(String(password), admin.password_hash);
-  if (!ok) return res.status(401).json({ error: "Credenciais inválidas." });
+    const r = await q("SELECT id, email, password_hash FROM admins WHERE email=$1", [e]);
+    if (r.rowCount === 0) return res.status(401).json({ error: "Credenciais inválidas." });
 
-  const token = signToken({ type: "admin", id: admin.id, email: admin.email });
-  res.json({ token, admin: { id: admin.id, name: admin.name, email: admin.email } });
+    const ok = await bcrypt.compare(p, r.rows[0].password_hash);
+    if (!ok) return res.status(401).json({ error: "Credenciais inválidas." });
+
+    const token = signToken({ type: "admin", admin_id: r.rows[0].id, email: r.rows[0].email }, "30d");
+    res.json({ token });
+  } catch (e) {
+    res.status(500).json({ error: "Erro interno." });
+  }
 });
 
 // =========================
-// Admin CRUD Drivers
+// ADMIN CRUD DRIVERS
 // =========================
 app.post("/admin/drivers", authAdmin, async (req, res) => {
-  const { name, cpf, phone, password, plate } = req.body || {};
-  if (!name || !cpf || !phone || !password || !plate) return res.status(400).json({ error: "Dados ausentes." });
+  try {
+    const { cpf, phone, name, plate, password } = req.body || {};
 
-  const hash = await bcrypt.hash(String(password), 10);
-  const r = await pool.query(
-    `INSERT INTO drivers (name, cpf, phone, password_hash, plate)
-     VALUES ($1,$2,$3,$4,$5)
-     RETURNING id, name, cpf, phone, plate, is_active, created_at`,
-    [String(name), String(cpf), String(phone), hash, String(plate).toUpperCase()]
-  );
+    const CPF = (cpf || "").trim();
+    const PHONE = (phone || "").trim() || null;
+    const NAME = (name || "").trim();
+    const PLATE = (plate || "").trim().toUpperCase();
+    const PASS = (password || "").trim();
 
-  res.json({ ok: true, driver: r.rows[0] });
+    if (!CPF || !NAME || !PLATE || !PASS) {
+      return res.status(400).json({ error: "cpf, name, plate, password são obrigatórios." });
+    }
+
+    const hash = await bcrypt.hash(PASS, 10);
+
+    const r = await q(
+      "INSERT INTO drivers (cpf, phone, name, plate, password_hash) VALUES ($1,$2,$3,$4,$5) RETURNING id, cpf, phone, name, plate, is_active, created_at",
+      [CPF, PHONE, NAME, PLATE, hash]
+    );
+
+    res.json({ driver: r.rows[0] });
+  } catch (e) {
+    if ((e.message || "").includes("duplicate key")) {
+      return res.status(409).json({ error: "CPF já existe." });
+    }
+    res.status(500).json({ error: "Erro interno." });
+  }
 });
 
 app.get("/admin/drivers", authAdmin, async (req, res) => {
-  const r = await pool.query(
-    "SELECT id, name, cpf, phone, plate, is_active, created_at FROM drivers ORDER BY id DESC"
-  );
-  res.json({ drivers: r.rows });
+  try {
+    const r = await q(
+      "SELECT id, cpf, phone, name, plate, is_active, created_at FROM drivers ORDER BY created_at DESC",
+      []
+    );
+    res.json({ drivers: r.rows });
+  } catch (e) {
+    res.status(500).json({ error: "Erro interno." });
+  }
 });
 
 app.patch("/admin/drivers/:id", authAdmin, async (req, res) => {
-  const id = Number(req.params.id);
-  const { name, cpf, phone, password, plate, is_active } = req.body || {};
+  try {
+    const id = req.params.id;
+    const { phone, name, plate, password, is_active } = req.body || {};
 
-  const cur = await pool.query("SELECT * FROM drivers WHERE id=$1", [id]);
-  if (cur.rowCount === 0) return res.status(404).json({ error: "Motorista não encontrado." });
+    const updates = [];
+    const vals = [];
+    let i = 1;
 
-  let hash = null;
-  if (password && String(password).trim() !== "") hash = await bcrypt.hash(String(password), 10);
+    if (phone !== undefined) { updates.push(`phone=$${i++}`); vals.push((phone || "").trim() || null); }
+    if (name !== undefined) { updates.push(`name=$${i++}`); vals.push((name || "").trim()); }
+    if (plate !== undefined) { updates.push(`plate=$${i++}`); vals.push((plate || "").trim().toUpperCase()); }
+    if (is_active !== undefined) { updates.push(`is_active=$${i++}`); vals.push(!!is_active); }
 
-  const next = {
-    name: name ?? cur.rows[0].name,
-    cpf: cpf ?? cur.rows[0].cpf,
-    phone: phone ?? cur.rows[0].phone,
-    plate: (plate ?? cur.rows[0].plate).toUpperCase(),
-    is_active: typeof is_active === "boolean" ? is_active : cur.rows[0].is_active,
-    password_hash: hash ?? cur.rows[0].password_hash
-  };
+    if (password !== undefined && (password || "").trim()) {
+      const hash = await bcrypt.hash((password || "").trim(), 10);
+      updates.push(`password_hash=$${i++}`);
+      vals.push(hash);
+    }
 
-  const r = await pool.query(
-    `UPDATE drivers
-     SET name=$1, cpf=$2, phone=$3, plate=$4, is_active=$5, password_hash=$6
-     WHERE id=$7
-     RETURNING id, name, cpf, phone, plate, is_active, created_at`,
-    [next.name, next.cpf, next.phone, next.plate, next.is_active, next.password_hash, id]
-  );
+    if (updates.length === 0) return res.status(400).json({ error: "Nada para atualizar." });
 
-  res.json({ ok: true, driver: r.rows[0] });
+    vals.push(id);
+    const r = await q(
+      `UPDATE drivers SET ${updates.join(", ")} WHERE id=$${i} RETURNING id, cpf, phone, name, plate, is_active, created_at`,
+      vals
+    );
+
+    if (r.rowCount === 0) return res.status(404).json({ error: "Motorista não encontrado." });
+    res.json({ driver: r.rows[0] });
+  } catch (e) {
+    res.status(500).json({ error: "Erro interno." });
+  }
 });
 
 // =========================
-// Driver Auth
+// DRIVER AUTH (CPF + senha)
 // =========================
 app.post("/driver/login", async (req, res) => {
-  const { identifier, password } = req.body || {};
-  if (!identifier || !password) return res.status(400).json({ error: "Dados ausentes." });
+  try {
+    const { identifier, password } = req.body || {};
+    const cpf = (identifier || "").trim();
+    const pass = (password || "").trim();
 
-  const idf = String(identifier);
-  const r = await pool.query(
-    `SELECT id, name, cpf, phone, plate, is_active, password_hash
-     FROM drivers
-     WHERE cpf=$1 OR phone=$1`,
-    [idf]
-  );
-  if (r.rowCount === 0) return res.status(401).json({ error: "Credenciais inválidas." });
+    if (!cpf || !pass) return res.status(400).json({ error: "CPF e senha obrigatórios." });
 
-  const d = r.rows[0];
-  if (!d.is_active) return res.status(403).json({ error: "Usuário inativo." });
+    const r = await q(
+      "SELECT id, cpf, name, plate, password_hash, is_active FROM drivers WHERE cpf=$1",
+      [cpf]
+    );
+    if (r.rowCount === 0) return res.status(401).json({ error: "Credenciais inválidas." });
+    if (!r.rows[0].is_active) return res.status(403).json({ error: "Usuário desativado." });
 
-  const ok = await bcrypt.compare(String(password), d.password_hash);
-  if (!ok) return res.status(401).json({ error: "Credenciais inválidas." });
+    const ok = await bcrypt.compare(pass, r.rows[0].password_hash);
+    if (!ok) return res.status(401).json({ error: "Credenciais inválidas." });
 
-  const token = signToken({ type: "driver", id: d.id, plate: d.plate });
-  res.json({ token, driver: { id: d.id, name: d.name, plate: d.plate } });
+    const token = signToken(
+      { type: "driver", driver_id: r.rows[0].id, cpf: r.rows[0].cpf, plate: r.rows[0].plate },
+      "30d"
+    );
+
+    res.json({
+      token,
+      driver: { id: r.rows[0].id, cpf: r.rows[0].cpf, name: r.rows[0].name, plate: r.rows[0].plate }
+    });
+  } catch (e) {
+    res.status(500).json({ error: "Erro interno." });
+  }
 });
 
 // =========================
-// Trip Lifecycle
+// TRIP START / FINISH
 // =========================
 app.post("/trip/start", authDriver, async (req, res) => {
-  const tripId = uuidv4();
-  const driverId = req.driver.id;
-  const plate = (req.driver.plate || "").toUpperCase();
-  const now = new Date();
+  try {
+    const driverId = req.driver.driver_id;
 
-  await pool.query(
-    `INSERT INTO trips (id, driver_id, plate, status, started_at, last_seen_at)
-     VALUES ($1,$2,$3,'started',$4,$4)`,
-    [tripId, driverId, plate, now]
-  );
+    // fecha qualquer active antiga por segurança (opcional)
+    await q("UPDATE trips SET status='finished', finish_at=NOW() WHERE driver_id=$1 AND status='active'", [driverId]);
 
-  broadcast("trip_started", { trip_id: tripId, driver_id: driverId, plate, started_at: now.toISOString() });
-  res.json({ ok: true, trip_id: tripId, plate });
-});
+    const dr = await q("SELECT plate FROM drivers WHERE id=$1", [driverId]);
+    if (dr.rowCount === 0) return res.status(404).json({ error: "Motorista não encontrado." });
 
-app.post("/trip/pause", authDriver, async (req, res) => {
-  const { trip_id } = req.body || {};
-  if (!trip_id) return res.status(400).json({ error: "trip_id ausente." });
+    const plate = dr.rows[0].plate;
 
-  const r = await pool.query(
-    `UPDATE trips
-     SET status='paused', last_seen_at=NOW()
-     WHERE id=$1 AND driver_id=$2
-     RETURNING id, status, plate`,
-    [String(trip_id), req.driver.id]
-  );
-  if (r.rowCount === 0) return res.status(404).json({ error: "Viagem não encontrada." });
+    const r = await q(
+      "INSERT INTO trips (driver_id, plate, status) VALUES ($1,$2,'active') RETURNING id",
+      [driverId, plate]
+    );
 
-  broadcast("trip_paused", { trip_id, driver_id: req.driver.id, plate: r.rows[0].plate });
-  res.json({ ok: true });
+    res.json({ trip_id: r.rows[0].id });
+  } catch (e) {
+    res.status(500).json({ error: "Erro interno." });
+  }
 });
 
 app.post("/trip/finish", authDriver, async (req, res) => {
-  const { trip_id } = req.body || {};
-  if (!trip_id) return res.status(400).json({ error: "trip_id ausente." });
+  try {
+    const driverId = req.driver.driver_id;
+    const { trip_id } = req.body || {};
+    const tripId = (trip_id || "").trim();
+    if (!tripId) return res.status(400).json({ error: "trip_id obrigatório." });
 
-  const r = await pool.query(
-    `UPDATE trips
-     SET status='finished', ended_at=NOW(), last_seen_at=NOW()
-     WHERE id=$1 AND driver_id=$2
-     RETURNING id, status, plate`,
-    [String(trip_id), req.driver.id]
-  );
-  if (r.rowCount === 0) return res.status(404).json({ error: "Viagem não encontrada." });
+    const r = await q(
+      "UPDATE trips SET status='finished', finish_at=NOW() WHERE id=$1 AND driver_id=$2 AND status='active' RETURNING id",
+      [tripId, driverId]
+    );
 
-  broadcast("trip_finished", { trip_id, driver_id: req.driver.id, plate: r.rows[0].plate });
-  res.json({ ok: true });
+    if (r.rowCount === 0) return res.status(404).json({ error: "Viagem ativa não encontrada." });
+
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: "Erro interno." });
+  }
 });
 
 // =========================
-// Position Ingest
+// POSITION INGEST
 // =========================
 app.post("/position", authDriver, async (req, res) => {
-  const {
-    trip_id, ts, lat, lng, speed, heading, accuracy, battery
-  } = req.body || {};
+  try {
+    const driverId = req.driver.driver_id;
+    const plateFromToken = req.driver.plate;
 
-  if (!trip_id || lat == null || lng == null) {
-    return res.status(400).json({ error: "Dados ausentes (trip_id/lat/lng)." });
+    const { trip_id, ts, lat, lng, speed, heading, accuracy } = req.body || {};
+    const tripId = (trip_id || "").trim();
+
+    if (!tripId) return res.status(400).json({ error: "trip_id obrigatório." });
+    if (typeof lat !== "number" || typeof lng !== "number") return res.status(400).json({ error: "lat/lng obrigatórios." });
+
+    // valida viagem ativa do próprio motorista
+    const t = await q("SELECT id, plate FROM trips WHERE id=$1 AND driver_id=$2 AND status='active'", [tripId, driverId]);
+    if (t.rowCount === 0) return res.status(403).json({ error: "Viagem inválida ou finalizada." });
+
+    const plate = t.rows[0].plate || plateFromToken;
+    const TS = typeof ts === "number" ? ts : Date.now();
+
+    await q(
+      "INSERT INTO positions (trip_id, driver_id, plate, ts, lat, lng, speed, heading, accuracy) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)",
+      [tripId, driverId, plate, TS, lat, lng, speed ?? null, heading ?? null, accuracy ?? null]
+    );
+
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: "Erro interno." });
   }
+});
 
-  const driverId = req.driver.id;
-  const plate = (req.driver.plate || "").toUpperCase();
-  const t = ts ? new Date(ts) : new Date();
-
-  await pool.query(
-    `INSERT INTO positions (trip_id, driver_id, plate, ts, lat, lng, speed, heading, accuracy, battery)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
-    [String(trip_id), driverId, plate, t, Number(lat), Number(lng),
-      speed == null ? null : Number(speed),
-      heading == null ? null : Number(heading),
-      accuracy == null ? null : Number(accuracy),
-      battery == null ? null : Number(battery)
-    ]
-  );
-
-  const upd = await pool.query(
-    `UPDATE trips
-     SET last_lat=$1, last_lng=$2, last_speed=$3, last_heading=$4, last_accuracy=$5, last_battery=$6, last_seen_at=NOW()
-     WHERE id=$7 AND driver_id=$8
-     RETURNING id, status, plate, last_lat, last_lng, last_speed, last_seen_at`,
-    [Number(lat), Number(lng),
-      speed == null ? null : Number(speed),
-      heading == null ? null : Number(heading),
-      accuracy == null ? null : Number(accuracy),
-      battery == null ? null : Number(battery),
-      String(trip_id), driverId
-    ]
-  );
-
-  if (upd.rowCount > 0) {
-    broadcast("position", {
-      trip_id: upd.rows[0].id,
-      plate: upd.rows[0].plate,
-      status: upd.rows[0].status,
-      lat: upd.rows[0].last_lat,
-      lng: upd.rows[0].last_lng,
-      speed: upd.rows[0].last_speed,
-      last_seen_at: upd.rows[0].last_seen_at
+// =========================
+// ADMIN DASHBOARD ENDPOINTS
+// =========================
+app.get("/admin/overview", authAdmin, async (req, res) => {
+  try {
+    const activeTrips = await q("SELECT COUNT(*)::int AS n FROM trips WHERE status='active'", []);
+    const drivers = await q("SELECT COUNT(*)::int AS n FROM drivers WHERE is_active=true", []);
+    res.json({
+      active_trips: activeTrips.rows[0].n,
+      active_drivers: drivers.rows[0].n
     });
+  } catch (e) {
+    res.status(500).json({ error: "Erro interno." });
   }
+});
 
-  res.json({ ok: true });
+app.get("/admin/trips", authAdmin, async (req, res) => {
+  try {
+    const status = (req.query.status || "").toString().trim();
+    const where = status ? "WHERE t.status=$1" : "";
+    const params = status ? [status] : [];
+    const r = await q(
+      `
+      SELECT
+        t.id,
+        t.status,
+        t.start_at,
+        t.finish_at,
+        t.plate,
+        d.name as driver_name,
+        d.cpf as driver_cpf
+      FROM trips t
+      JOIN drivers d ON d.id = t.driver_id
+      ${where}
+      ORDER BY t.created_at DESC
+      LIMIT 200
+      `,
+      params
+    );
+    res.json({ trips: r.rows });
+  } catch (e) {
+    res.status(500).json({ error: "Erro interno." });
+  }
+});
+
+// “Mapa em tempo real”: retorna a última posição de cada viagem ativa (para plotar no mapa)
+app.get("/admin/live", authAdmin, async (req, res) => {
+  try {
+    const r = await q(
+      `
+      WITH lastpos AS (
+        SELECT DISTINCT ON (p.trip_id)
+          p.trip_id,
+          p.plate,
+          p.lat,
+          p.lng,
+          p.speed,
+          p.heading,
+          p.accuracy,
+          p.ts,
+          p.created_at
+        FROM positions p
+        ORDER BY p.trip_id, p.created_at DESC
+      )
+      SELECT
+        t.id as trip_id,
+        t.plate,
+        t.start_at,
+        d.name as driver_name,
+        d.cpf as driver_cpf,
+        lp.lat,
+        lp.lng,
+        lp.speed,
+        lp.heading,
+        lp.accuracy,
+        lp.ts,
+        lp.created_at as last_seen
+      FROM trips t
+      JOIN drivers d ON d.id = t.driver_id
+      LEFT JOIN lastpos lp ON lp.trip_id = t.id
+      WHERE t.status='active'
+      ORDER BY t.start_at DESC
+      `,
+      []
+    );
+
+    res.json({ live: r.rows });
+  } catch (e) {
+    res.status(500).json({ error: "Erro interno." });
+  }
+});
+
+// SSE simples para “quase tempo real” sem WebSocket (o painel pode usar EventSource)
+app.get("/admin/stream", authAdmin, async (req, res) => {
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("Connection", "keep-alive");
+
+  let alive = true;
+  req.on("close", () => { alive = false; });
+
+  const send = async () => {
+    if (!alive) return;
+
+    try {
+      const r = await q(
+        `
+        WITH lastpos AS (
+          SELECT DISTINCT ON (p.trip_id)
+            p.trip_id, p.plate, p.lat, p.lng, p.speed, p.heading, p.accuracy, p.ts, p.created_at
+          FROM positions p
+          ORDER BY p.trip_id, p.created_at DESC
+        )
+        SELECT
+          t.id as trip_id,
+          t.plate,
+          d.name as driver_name,
+          d.cpf as driver_cpf,
+          lp.lat,
+          lp.lng,
+          lp.speed,
+          lp.heading,
+          lp.accuracy,
+          lp.ts,
+          lp.created_at as last_seen
+        FROM trips t
+        JOIN drivers d ON d.id = t.driver_id
+        LEFT JOIN lastpos lp ON lp.trip_id = t.id
+        WHERE t.status='active'
+        ORDER BY t.start_at DESC
+        `,
+        []
+      );
+
+      res.write(`event: live\n`);
+      res.write(`data: ${JSON.stringify({ live: r.rows, now: Date.now() })}\n\n`);
+    } catch (e) {
+      res.write(`event: error\n`);
+      res.write(`data: ${JSON.stringify({ error: "stream_error" })}\n\n`);
+    }
+
+    setTimeout(send, 5000); // a cada 5s
+  };
+
+  send();
 });
 
 // =========================
-// Dashboard Data (Web)
+// BOOT
 // =========================
-app.get("/dashboard/trips", async (req, res) => {
-  const days = Math.max(1, Math.min(30, Number(req.query.days || 30)));
-  const r = await pool.query(
-    `SELECT
-       t.id, t.plate, t.status, t.started_at, t.ended_at,
-       t.last_lat, t.last_lng, t.last_speed, t.last_seen_at,
-       d.name AS driver_name
-     FROM trips t
-     JOIN drivers d ON d.id=t.driver_id
-     WHERE t.started_at >= NOW() - ($1 || ' days')::interval
-     ORDER BY t.started_at DESC
-     LIMIT 500`,
-    [days]
-  );
-  res.json({ trips: r.rows });
-});
+(async () => {
+  try {
+    await ensureSchema();
+    await ensureBootstrapAdmin();
+
+    app.listen(PORT, () => {
+      console.log("Moove Tracking API rodando na porta:", PORT);
+    });
+  } catch (e) {
+    console.error("Falha ao iniciar:", e);
+    process.exit(1);
+  }
+})();
