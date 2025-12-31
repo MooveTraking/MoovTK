@@ -99,48 +99,48 @@ setInterval(() => {
 }, 1000);
 
 
-document.getElementById("btnAdd").onclick = ()=>{
+document.getElementById("btnAdd").onclick = () => {
   const f = document.getElementById("driverForm");
-  f.style.display = f.style.display=="none"?"block":"none";
+  f.style.display = f.style.display === "none" ? "block" : "none";
 };
 
-async function createDriver(){
-  async function createDriver(){
+document.getElementById("btnSaveDriver").addEventListener("click", createDriver);
+
+async function createDriver() {
   try {
     const cpf = fCpf().value.trim();
     const name = fName().value.trim();
     const plate = fPlate().value.trim();
     const password = fPass().value.trim();
 
-    if(!cpf || !name || !plate || !password){
+    if (!cpf || !name || !plate || !password) {
       alert("Preencha todos os campos");
       return;
     }
 
-    const res = await fetch(API+"/admin/create-driver",{
-      method:"POST",
-      headers:{
-        "Content-Type":"application/json",
-        "Authorization":"Bearer "+token
+    const res = await fetch(API + "/admin/create-driver", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer " + token
       },
       body: JSON.stringify({ cpf, name, plate, password })
     });
 
     const j = await res.json();
 
-    if(!res.ok){
+    if (!res.ok) {
       alert(j.error || "Erro ao criar motorista");
       return;
     }
 
     alert("Motorista criado com sucesso");
-    fCpf().value="";
-    fName().value="";
-    fPlate().value="";
-    fPass().value="";
-  } catch(e){
+
+    fCpf().value = "";
+    fName().value = "";
+    fPlate().value = "";
+    fPass().value = "";
+  } catch (e) {
     alert("Falha: " + e.message);
   }
 }
-
-
