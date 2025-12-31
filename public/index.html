@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+<meta charset="UTF-8">
+<title>Moove Tracking</title>
+<link rel="stylesheet" href="style.css">
+<link rel="preconnect" href="https://unpkg.com">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+</head>
+<body>
+
+<div id="login">
+  <div class="login-box">
+    <h1>Moove Tracking</h1>
+    <input id="email" placeholder="Admin Email">
+    <input id="password" type="password" placeholder="Senha">
+    <button onclick="login()">Entrar</button>
+    <p id="msg"></p>
+  </div>
+</div>
+
+<div id="panel" style="display:none">
+  <div class="sidebar">
+    <h2>Veículos Ativos</h2>
+    <div id="vehicles"></div>
+  </div>
+
+  <div id="map"></div>
+
+  <div class="stats">
+    <div><b id="count"></b> veículos em rota</div>
+    <div id="clock"></div>
+  </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
