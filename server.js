@@ -38,7 +38,10 @@ function authDriver(req, res, next) {
 
 function authAdmin(req, res, next) {
   const h = req.headers.authorization || "";
-  const token = h.startsWith("Bearer ") ? h.slice(7) : "";
+  const fromHeader = h.startsWith("Bearer ") ? h.slice(7) : "";
+  const fromQuery = (req.query && req.query.token) ? req.query.token : "";
+  const token = fromHeader || fromQuery;
+
   if (!token) return res.status(401).json({ error: "Token ausente." });
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
