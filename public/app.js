@@ -122,7 +122,7 @@ async function createDriver() {
       return;
     }
 
-    const res = await fetch(API + "/admin/create-driver", {
+    const res = await fetch(API + "/admin/drivers", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
