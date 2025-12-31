@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Moove Tracking · Painel</title>
+  <link rel="stylesheet" href="style.css"/>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <div class="brand">
+      <div class="badge">MT</div>
+      <div>
+        <h1>Moove Tracking · Painel</h1>
+        <small>Mapa e viagens em tempo real</small>
+      </div>
+    </div>
+    <div class="nav">
+      <select id="days" class="btn">
+        <option value="1">Hoje</option>
+        <option value="7">7 dias</option>
+        <option value="15">15 dias</option>
+        <option value="30" selected>30 dias</option>
+      </select>
+      <button id="btnReload" class="btn">Atualizar</button>
+      <a class="btn" href="admin.html">Admin</a>
+      <a class="btn" href="index.html">Início</a>
+    </div>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <div class="h"><h2>Resumo Operacional</h2></div>
+      <div class="kpis">
+        <div class="kpi"><b id="k_started">0</b><span>Viagens em andamento</span></div>
+        <div class="kpi"><b id="k_paused">0</b><span>Pausadas</span></div>
+        <div class="kpi"><b id="k_stale">0</b><span>Sem atualização</span></div>
+      </div>
+
+      <div style="height:14px"></div>
+      <div class="h"><h2>Viagens</h2><span style="color:var(--muted)" id="wsStatus">WS: -</span></div>
+
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Status</th>
+            <th>Placa</th>
+            <th>Motorista</th>
+            <th>Início</th>
+            <th>Última atualização</th>
+            <th>Vel.</th>
+          </tr>
+        </thead>
+        <tbody id="tripsTbody"></tbody>
+      </table>
+    </div>
+
+    <div class="card">
+      <div class="h"><h2>Mapa</h2></div>
+      <div id="map" class="map"></div>
+      <div style="margin-top:10px;color:var(--muted);font-size:12px">
+        Sem atualização = mais de 10 minutos sem posição.
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="app.js"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="dashboard.js"></script>
+</body>
+</html>
