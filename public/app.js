@@ -1,5 +1,11 @@
 const API = "https://moovtk.onrender.com";
 
+const fCpf = () => document.getElementById("fCpf");
+const fName = () => document.getElementById("fName");
+const fPlate = () => document.getElementById("fPlate");
+const fPass = () => document.getElementById("fPass");
+
+
 let token = "";
 let map = null;
 let markers = {};
@@ -99,21 +105,42 @@ document.getElementById("btnAdd").onclick = ()=>{
 };
 
 async function createDriver(){
-  const cpf = document.getElementById("fCpf").value;
-  const name = document.getElementById("fName").value;
-  const plate = document.getElementById("fPlate").value;
-  const password = document.getElementById("fPass").value;
+  async function createDriver(){
+  try {
+    const cpf = fCpf().value.trim();
+    const name = fName().value.trim();
+    const plate = fPlate().value.trim();
+    const password = fPass().value.trim();
 
-  const res = await fetch(API+"/admin/create-driver",{
-    method:"POST",
-    headers:{
-      "Content-Type":"application/json",
-      "Authorization":"Bearer "+token
-    },
-    body:JSON.stringify({cpf,name,plate,password})
-  });
+    if(!cpf || !name || !plate || !password){
+      alert("Preencha todos os campos");
+      return;
+    }
 
-  const j = await res.json();
-  alert(j.success?"Motorista criado":"Erro: "+j.error);
+    const res = await fetch(API+"/admin/create-driver",{
+      method:"POST",
+      headers:{
+        "Content-Type":"application/json",
+        "Authorization":"Bearer "+token
+      },
+      body: JSON.stringify({ cpf, name, plate, password })
+    });
+
+    const j = await res.json();
+
+    if(!res.ok){
+      alert(j.error || "Erro ao criar motorista");
+      return;
+    }
+
+    alert("Motorista criado com sucesso");
+    fCpf().value="";
+    fName().value="";
+    fPlate().value="";
+    fPass().value="";
+  } catch(e){
+    alert("Falha: " + e.message);
+  }
 }
+
 
