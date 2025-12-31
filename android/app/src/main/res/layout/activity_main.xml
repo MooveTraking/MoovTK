@@ -1,0 +1,72 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:orientation="vertical"
+    android:padding="16dp"
+    android:background="#0b1220"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <TextView
+        android:text="Moove TK"
+        android:textSize="24sp"
+        android:textStyle="bold"
+        android:textColor="#FFFFFF"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"/>
+
+    <EditText
+        android:id="@+id/etCpf"
+        android:hint="CPF"
+        android:layout_marginTop="16dp"
+        android:inputType="text"
+        android:textColor="#FFFFFF"
+        android:hintTextColor="#9CA3AF"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"/>
+
+    <EditText
+        android:id="@+id/etSenha"
+        android:hint="Senha"
+        android:layout_marginTop="8dp"
+        android:inputType="textPassword"
+        android:textColor="#FFFFFF"
+        android:hintTextColor="#9CA3AF"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"/>
+
+    <Button
+        android:id="@+id/btnEntrar"
+        android:text="Entrar"
+        android:layout_marginTop="12dp"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"/>
+
+    <View
+        android:layout_marginTop="16dp"
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="#1e2b4d"/>
+
+    <TextView
+        android:id="@+id/tvStatus"
+        android:text="Status: Desconectado"
+        android:textColor="#FFFFFF"
+        android:layout_marginTop="16dp"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"/>
+
+    <Button
+        android:id="@+id/btnIniciar"
+        android:text="INICIAR VIAGEM"
+        android:enabled="false"
+        android:layout_marginTop="12dp"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"/>
+
+    <Button
+        android:id="@+id/btnFinalizar"
+        android:text="FINALIZAR VIAGEM"
+        android:enabled="false"
+        android:layout_marginTop="8dp"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"/>
+</LinearLayout>
