@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Moove Tracking · Admin</title>
+  <link rel="stylesheet" href="style.css"/>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <div class="brand">
+      <div class="badge">MT</div>
+      <div>
+        <h1>Moove Tracking · Admin</h1>
+        <small>Somente o admin cria usuários</small>
+      </div>
+    </div>
+    <div class="nav">
+      <a class="btn" href="dashboard.html">Painel</a>
+      <a class="btn" href="index.html">Início</a>
+    </div>
+  </div>
+
+  <div class="grid" style="grid-template-columns:1fr 1fr">
+    <div class="card">
+      <div class="h"><h2>Login Admin</h2></div>
+      <input id="email" class="input" placeholder="E-mail admin" />
+      <div style="height:8px"></div>
+      <input id="password" type="password" class="input" placeholder="Senha admin" />
+      <div style="height:10px"></div>
+      <button id="btnLogin" class="btn pri">Entrar</button>
+      <div id="loginMsg" style="margin-top:10px;color:var(--muted)"></div>
+    </div>
+
+    <div class="card">
+      <div class="h"><h2>Criar Motorista</h2></div>
+      <input id="dname" class="input" placeholder="Nome" />
+      <div style="height:8px"></div>
+      <input id="dcpf" class="input" placeholder="CPF" />
+      <div style="height:8px"></div>
+      <input id="dphone" class="input" placeholder="Telefone" />
+      <div style="height:8px"></div>
+      <input id="dplate" class="input" placeholder="Placa (ABC1D23)" />
+      <div style="height:8px"></div>
+      <input id="dpass" type="password" class="input" placeholder="Senha" />
+      <div style="height:10px"></div>
+      <button id="btnCreate" class="btn pri">Criar</button>
+      <div id="createMsg" style="margin-top:10px;color:var(--muted)"></div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:14px">
+    <div class="h"><h2>Motoristas</h2></div>
+    <table class="table">
+      <thead>
+        <tr>
+          <th>ID</th><th>Nome</th><th>CPF</th><th>Telefone</th><th>Placa</th><th>Ativo</th>
+        </tr>
+      </thead>
+      <tbody id="driversTbody"></tbody>
+    </table>
+  </div>
+</div>
+
+<script src="app.js"></script>
+<script src="admin.js"></script>
+</body>
+</html>
