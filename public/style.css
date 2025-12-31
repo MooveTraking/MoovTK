@@ -1,0 +1,59 @@
+body {
+  margin:0;
+  font-family: Inter, Arial;
+  background:#0b1220;
+  color:white;
+}
+#login {
+  height:100vh;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+.login-box {
+  background:#111a2e;
+  padding:40px;
+  border-radius:12px;
+  width:320px;
+}
+input,button {
+  width:100%;
+  padding:12px;
+  margin-top:10px;
+  border-radius:6px;
+  border:none;
+}
+button {
+  background:#2de38f;
+  font-weight:bold;
+}
+#panel {
+  display:grid;
+  grid-template-columns:320px 1fr;
+  grid-template-rows:1fr 60px;
+  height:100vh;
+}
+.sidebar {
+  background:#0f1a33;
+  overflow:auto;
+  padding:10px;
+}
+.vehicle {
+  padding:12px;
+  border-bottom:1px solid #1e2b4d;
+  cursor:pointer;
+}
+.vehicle.active {
+  background:#1c2f5a;
+}
+#map {
+  grid-column:2;
+  grid-row:1;
+}
+.stats {
+  grid-column:1 / span 2;
+  background:#0f1a33;
+  display:flex;
+  justify-content:space-between;
+  padding:12px;
+}
