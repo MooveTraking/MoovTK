@@ -57,3 +57,23 @@ button {
   justify-content:space-between;
   padding:12px;
 }
+
+
+.add-btn {
+  width:100%;
+  padding:10px;
+  margin-bottom:10px;
+  background:#2de38f;
+  border:none;
+  font-weight:bold;
+  border-radius:6px;
+}
+
+.form input {
+  width:100%;
+  margin-top:6px;
+  padding:8px;
+  border-radius:6px;
+  border:none;
+}
+
