@@ -1,0 +1,55 @@
+CREATE TABLE IF NOT EXISTS admins (
+  id SERIAL PRIMARY KEY,
+  name TEXT NOT NULL,
+  email TEXT UNIQUE NOT NULL,
+  password_hash TEXT NOT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS drivers (
+  id SERIAL PRIMARY KEY,
+  name TEXT NOT NULL,
+  cpf TEXT NOT NULL,
+  phone TEXT NOT NULL,
+  password_hash TEXT NOT NULL,
+  plate TEXT NOT NULL,
+  is_active BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+  UNIQUE (cpf),
+  UNIQUE (phone)
+);
+
+CREATE TABLE IF NOT EXISTS trips (
+  id UUID PRIMARY KEY,
+  driver_id INT NOT NULL REFERENCES drivers(id) ON DELETE CASCADE,
+  plate TEXT NOT NULL,
+  status TEXT NOT NULL CHECK (status IN ('started','paused','finished')),
+  started_at TIMESTAMP NOT NULL,
+  ended_at TIMESTAMP NULL,
+  last_lat DOUBLE PRECISION NULL,
+  last_lng DOUBLE PRECISION NULL,
+  last_speed DOUBLE PRECISION NULL,
+  last_heading DOUBLE PRECISION NULL,
+  last_accuracy DOUBLE PRECISION NULL,
+  last_battery INT NULL,
+  last_seen_at TIMESTAMP NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS positions (
+  id BIGSERIAL PRIMARY KEY,
+  trip_id UUID NOT NULL REFERENCES trips(id) ON DELETE CASCADE,
+  driver_id INT NOT NULL REFERENCES drivers(id) ON DELETE CASCADE,
+  plate TEXT NOT NULL,
+  ts TIMESTAMP NOT NULL,
+  lat DOUBLE PRECISION NOT NULL,
+  lng DOUBLE PRECISION NOT NULL,
+  speed DOUBLE PRECISION NULL,
+  heading DOUBLE PRECISION NULL,
+  accuracy DOUBLE PRECISION NULL,
+  battery INT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_positions_trip_ts ON positions(trip_id, ts DESC);
+CREATE INDEX IF NOT EXISTS idx_trips_last_seen ON trips(last_seen_at DESC);
