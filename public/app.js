@@ -91,3 +91,29 @@ function startStream() {
 setInterval(() => {
   if (clockEl) clockEl.innerText = new Date().toLocaleTimeString();
 }, 1000);
+
+
+document.getElementById("btnAdd").onclick = ()=>{
+  const f = document.getElementById("driverForm");
+  f.style.display = f.style.display=="none"?"block":"none";
+};
+
+async function createDriver(){
+  const cpf = document.getElementById("fCpf").value;
+  const name = document.getElementById("fName").value;
+  const plate = document.getElementById("fPlate").value;
+  const password = document.getElementById("fPass").value;
+
+  const res = await fetch(API+"/admin/create-driver",{
+    method:"POST",
+    headers:{
+      "Content-Type":"application/json",
+      "Authorization":"Bearer "+token
+    },
+    body:JSON.stringify({cpf,name,plate,password})
+  });
+
+  const j = await res.json();
+  alert(j.success?"Motorista criado":"Erro: "+j.error);
+}
+
