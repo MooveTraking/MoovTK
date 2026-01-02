@@ -15,20 +15,24 @@ async function q(text, params) {
   return pool.query(text, params);
 }
 
+async function initDB() {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS gps_logs (
+      id SERIAL PRIMARY KEY,
+      device_id TEXT,
+      trip_id TEXT,
+      latitude DOUBLE PRECISION,
+      longitude DOUBLE PRECISION,
+      speed DOUBLE PRECISION,
+      accuracy DOUBLE PRECISION,
+      battery INTEGER,
+      created_at TIMESTAMP DEFAULT NOW()
+    );
+  `);
+}
+
+initDB().catch(err => {
+  console.error("DB INIT ERROR:", err);
+});
+
 module.exports = { pool, q };
-
-
-await pool.query(`
-CREATE TABLE IF NOT EXISTS gps_logs (
-  id SERIAL PRIMARY KEY,
-  device_id TEXT,
-  trip_id TEXT,
-  latitude DOUBLE PRECISION,
-  longitude DOUBLE PRECISION,
-  speed DOUBLE PRECISION,
-  accuracy DOUBLE PRECISION,
-  battery INTEGER,
-  created_at TIMESTAMP DEFAULT NOW()
-);
-`);
-
