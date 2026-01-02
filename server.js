@@ -35,7 +35,6 @@ app.use((req, res, next) => {
 });
 
 
-
 const PORT = process.env.PORT || 10000;
 const JWT_SECRET = process.env.JWT_SECRET || "change-me";
 
