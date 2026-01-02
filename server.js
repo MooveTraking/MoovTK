@@ -12,7 +12,7 @@ const { q } = require("./db");
 const app = express();
 
 
-import gpsRoutes from "./gps.js";
+const gpsRoutes = require("./gps.js");
 
 app.use(express.json());
 app.use(gpsRoutes);
