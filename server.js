@@ -10,6 +10,14 @@ const jwt = require("jsonwebtoken");
 const { q } = require("./db");
 
 const app = express();
+
+
+import gpsRoutes from "./gps.js";
+
+app.use(express.json());
+app.use(gpsRoutes);
+
+
 app.use(express.static(path.join(__dirname, "public")));
 app.use(express.json({ limit: "1mb" }));
 
