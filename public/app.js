@@ -94,9 +94,14 @@ function showPanel() {
   loginDiv.style.display = "none";
   panelDiv.style.display = "block";
 
+  setTimeout(() => {
+    map.invalidateSize();
+  }, 300);
+
   loadDrivers();
   startStream();
 }
+
 
 async function doLogin() {
   msgEl.innerText = "";
