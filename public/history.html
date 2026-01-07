@@ -11,8 +11,10 @@
 
 <h2>Histórico de Viagens</h2>
 
-<input type="date" id="date">
-<button onclick="loadTrips()">Buscar</button>
+<select id="plate"></select>
+<input type="datetime-local" id="start">
+<input type="datetime-local" id="end">
+<button onclick="buscar()">Buscar</button>
 
 <div id="list"></div>
 <div id="map" style="height:500px"></div>
@@ -21,42 +23,57 @@
 const API = "https://moovtk.onrender.com";
 const token = localStorage.getItem("admin_token");
 
-let map = L.map("map").setView([-27.6,-48.5],7);
+let map = L.map("map").setView([-27,-48],7);
 L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(map);
 
 let line = null;
 
-async function loadTrips(){
-  const d = document.getElementById("date").value;
+async function loadPlates(){
+  const r = await fetch(API+"/admin/plates",{headers:{Authorization:"Bearer "+token}});
+  const data = await r.json();
+  plate.innerHTML="";
+  data.plates.forEach(p=>{
+    const o=document.createElement("option");
+    o.value=p;o.innerText=p;
+    plate.appendChild(o);
+  });
+}
+loadPlates();
 
-  const r = await fetch(API + "/admin/trips-by-date?date=" + d,{
+async function buscar(){
+  const p = plate.value;
+  const s = start.value;
+  const e = end.value;
+
+  const r = await fetch(`${API}/admin/trips/search?plate=${p}&start=${s}&end=${e}`,{
     headers:{Authorization:"Bearer "+token}
   });
-
   const data = await r.json();
-  list.innerHTML = "";
 
+  list.innerHTML="";
   data.trips.forEach(t=>{
-    const div = document.createElement("div");
-    div.innerHTML = `${t.plate} — ${new Date(t.start_at).toLocaleString()} 
-      <button onclick="showTrip('${t.id}')">Ver</button>`;
+    const div=document.createElement("div");
+    div.innerHTML = `
+      ${t.plate} — ${new Date(t.start_at).toLocaleString()}
+      <button onclick="ver('${t.id}')">Ver</button>
+    `;
     list.appendChild(div);
   });
 }
 
-async function showTrip(id){
-  const r = await fetch(API + "/admin/trips/"+id+"/history",{
+async function ver(id){
+  const r = await fetch(API+"/admin/trips/"+id+"/positions",{
     headers:{Authorization:"Bearer "+token}
   });
-
   const data = await r.json();
 
-  const points = data.points.map(p=>[p.lat,p.lng]);
+  const pts = data.points.map(p=>[p.lat,p.lng]);
 
   if(line) map.removeLayer(line);
-  line = L.polyline(points,{color:"blue"}).addTo(map);
+  line = L.polyline(pts).addTo(map);
   map.fitBounds(line.getBounds());
 }
 </script>
+
 </body>
 </html>
