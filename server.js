@@ -2,7 +2,7 @@ require("dotenv").config();
 
 console.log("DEPLOY-ATLAS-FIX-2026");
 
-
+const fetch = require("node-fetch");
 const fs = require("fs");
 const path = require("path");
 const express = require("express");
@@ -524,12 +524,42 @@ app.get("/admin/trips/search", authAdmin, async (req, res) => {
 
 
 app.get("/admin/trips/:id/positions", authAdmin, async (req, res) => {
-  const r = await q(`
-    SELECT ts, lat, lng
-    FROM positions
-    WHERE trip_id = $1
-    ORDER BY ts
-  `, [req.params.id]);
+  try {
+    const id = req.params.id;
 
-  res.json({ points: r.rows });
+    const r = await q(
+      `SELECT lat, lng
+       FROM positions
+       WHERE trip_id = $1
+       ORDER BY ts ASC`,
+      [id]
+    );
+
+    if (r.rowCount < 2) {
+      return res.json({ points: r.rows });
+    }
+
+    const coords = r.rows.map(p => `${p.lng},${p.lat}`).join(";");
+
+    const url = `https://router.project-osrm.org/match/v1/driving/${coords}?geometries=geojson&overview=full`;
+
+    const resp = await fetch(url);
+    const data = await resp.json();
+
+    if (!data.matchings || !data.matchings.length) {
+      return res.json({ points: r.rows });
+    }
+
+    const shape = data.matchings[0].geometry.coordinates.map(c => ({
+      lat: c[1],
+      lng: c[0]
+    }));
+
+    res.json({ points: shape });
+
+  } catch (e) {
+    console.error("MATCH ERROR", e);
+    res.status(500).json({ error: "map matching failed" });
+  }
 });
+
