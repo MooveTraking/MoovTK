@@ -130,6 +130,31 @@ app.get("/admin/drivers", authAdmin, async (req, res) => {
   }
 });
 
+
+
+
+// =========================
+// ADMIN DELETE DRIVER
+// =========================
+app.delete("/admin/drivers/:id", authAdmin, async (req, res) => {
+  try {
+    const id = req.params.id;
+
+    await q("DELETE FROM positions WHERE driver_id = $1", [id]);
+    await q("DELETE FROM trips WHERE driver_id = $1", [id]);
+    await q("DELETE FROM drivers WHERE id = $1", [id]);
+
+    res.json({ ok: true });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: "Erro ao excluir motorista." });
+  }
+});
+
+
+
+
+
 // =========================
 // DRIVER LOOKUP (PUBLIC)
 // =========================
