@@ -128,9 +128,16 @@ html, body {
 
 #panel {
   min-height: 100vh;
-  display: flex;
-  flex-direction: column;
 }
+
+#panel > .grid {
+  display: grid;
+}
+
+#panel > #map {
+  display: block;
+}
+
 
 #map {
   flex: 1;
