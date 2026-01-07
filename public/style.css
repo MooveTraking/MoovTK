@@ -140,10 +140,10 @@ html, body {
 
 
 #map {
-  flex: 1;
-  height: auto;
-  min-height: 420px;
+  height: 420px;
+  width: 100%;
 }
+
 
 
 
