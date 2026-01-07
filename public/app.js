@@ -23,18 +23,15 @@ function trimbleIcon(plate, heading, speed) {
   });
 }
 
-
 const fCpf = () => document.getElementById("fCpf");
 const fName = () => document.getElementById("fName");
 const fPlate = () => document.getElementById("fPlate");
 const fPass = () => document.getElementById("fPass");
 
-
 let token = localStorage.getItem("admin_token") || "";
 let map = null;
 let markers = {};
 let cluster = null;
-
 
 window.addEventListener("load", () => {
   window.emailEl = document.getElementById("email");
@@ -65,6 +62,7 @@ window.addEventListener("load", () => {
     showLogin();
   }
 
+  // Inicializa mapa depois que DOM está visível
   setTimeout(() => {
     map = L.map("map").setView([-27.6, -48.5], 7);
 
@@ -73,7 +71,7 @@ window.addEventListener("load", () => {
         return L.divIcon({
           html: `<div class="trimble-cluster">${c.getChildCount()}</div>`,
           className: "",
-          iconSize: [44,44]
+          iconSize: [44, 44]
         });
       }
     });
@@ -84,6 +82,7 @@ window.addEventListener("load", () => {
       maxZoom: 19
     }).addTo(map);
   }, 300);
+}); // <<< FECHAMENTO CORRETO DO window.load
 
 function showLogin() {
   loginDiv.style.display = "block";
@@ -96,12 +95,11 @@ function showPanel() {
 
   setTimeout(() => {
     if (map) map.invalidateSize();
-  }, 200);
+  }, 300);
 
   loadDrivers();
   startStream();
 }
-
 
 async function doLogin() {
   msgEl.innerText = "";
@@ -197,12 +195,11 @@ async function loadDrivers() {
       const div = document.createElement("div");
       div.className = "driver";
       div.innerHTML = `
-      <b>${d.name}</b><br>
-      ${d.cpf}<br>
-      ${d.plate}<br>
-      <button onclick="deleteDriver('${d.id}')">Excluir</button>
+        <b>${d.name}</b><br>
+        ${d.cpf}<br>
+        ${d.plate}<br>
+        <button onclick="deleteDriver('${d.id}')">Excluir</button>
       `;
-
       driversEl.appendChild(div);
     });
   } catch (e) {}
@@ -218,11 +215,6 @@ function startStream() {
     countEl.innerText = data.live.len;
 
     (data.live.rows || []).forEach(v => {
-      const item = document.createElement("div");
-      item.className = "vehicle";
-      item.innerHTML = `<b>${v.plate}</b><br>${v.name}<br>${new Date(v.ts).toLocaleString()}`;
-      vehiclesEl.appendChild(item);
-
       const key = v.plate;
       const latlng = [v.lat, v.lng];
 
@@ -237,15 +229,11 @@ function startStream() {
         markers[key].setLatLng(latlng);
         markers[key].setIcon(trimbleIcon(v.plate, v.heading, v.speed));
       }
-
-
-
     });
 
     clockEl.innerText = new Date(data.ts).toLocaleTimeString();
   });
 }
-
 
 async function deleteDriver(id) {
   if (!confirm("Deseja excluir este motorista? Todo o histórico será apagado.")) return;
