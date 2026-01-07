@@ -66,17 +66,9 @@ window.addEventListener("load", () => {
   setTimeout(() => {
     map = L.map("map").setView([-27.6, -48.5], 7);
 
-    cluster = L.markerClusterGroup({
-      iconCreateFunction: function(c) {
-        return L.divIcon({
-          html: `<div class="trimble-cluster">${c.getChildCount()}</div>`,
-          className: "",
-          iconSize: [44, 44]
-        });
-      }
-    });
+    cluster = L.markerClusterGroup();
+  map.addLayer(cluster);
 
-    map.addLayer(cluster);
 
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
       maxZoom: 19
@@ -223,11 +215,17 @@ function startStream() {
           icon: trimbleIcon(v.plate, v.heading, v.speed)
         });
 
-        cluster.addLayer(m);
+        if (cluster && map) {
+          cluster.addLayer(m);
+        }
+
         markers[key] = m;
+        if (cluster && map) cluster.addLayer(m);
+
       } else {
         markers[key].setLatLng(latlng);
         markers[key].setIcon(trimbleIcon(v.plate, v.heading, v.speed));
+
       }
     });
 
