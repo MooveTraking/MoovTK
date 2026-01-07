@@ -34,7 +34,8 @@ async function loadPlates(){
   plate.innerHTML="";
   data.plates.forEach(p=>{
     const o=document.createElement("option");
-    o.value=p;o.innerText=p;
+    o.value=p;
+    o.innerText=p;
     plate.appendChild(o);
   });
 }
@@ -76,18 +77,9 @@ async function ver(id){
   const geo = data.points.map(p => [p.lat, p.lng]);
 
   if(line) map.removeLayer(line);
-  line = L.polyline(geo, { color: "blue" }).addTo(map);
+  line = L.polyline(geo, { color: "blue", weight: 4 }).addTo(map);
   map.fitBounds(line.getBounds());
 }
-
-
-  const geo = routeData.matchings[0].geometry.coordinates.map(c => [c[1], c[0]]);
-
-  if(line) map.removeLayer(line);
-  line = L.polyline(geo, { color: "blue" }).addTo(map);
-  map.fitBounds(line.getBounds());
-}
-
 </script>
 
 </body>
