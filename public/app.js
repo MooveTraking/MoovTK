@@ -187,15 +187,16 @@ function startStream() {
       if (!markers[key]) {
         const icon = L.divIcon({
           className: "plate-marker",
-          html: `<div class="plate-label">${v.plate}</div>`,
-          iconSize: [80, 30],
-          iconAnchor: [40, 15]
+          html: `<div class="plate-badge">${key}</div>`,
+          iconSize: [80, 28],
+          iconAnchor: [40, 14]
         });
 
         markers[key] = L.marker(latlng, { icon }).addTo(map);
       } else {
         markers[key].setLatLng(latlng);
       }
+
 
     });
 
