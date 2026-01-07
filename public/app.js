@@ -185,10 +185,18 @@ function startStream() {
       const latlng = [v.lat, v.lng];
 
       if (!markers[key]) {
-        markers[key] = L.marker(latlng).addTo(map).bindPopup(key);
+        const icon = L.divIcon({
+          className: "plate-marker",
+          html: `<div class="plate-label">${v.plate}</div>`,
+          iconSize: [80, 30],
+          iconAnchor: [40, 15]
+        });
+
+        markers[key] = L.marker(latlng, { icon }).addTo(map);
       } else {
         markers[key].setLatLng(latlng);
       }
+
     });
 
     clockEl.innerText = new Date(data.ts).toLocaleTimeString();
