@@ -18,63 +18,66 @@ function trimbleIcon(plate, heading, speed) {
         ${moving ? `<div class="trimble-arrow" style="transform:rotate(${rot}deg)"></div>` : ""}
         <div class="trimble-plate">${plate}</div>
       </div>
-    `,
-    iconSize: null
+    `
   });
 }
 
-const fCpf = () => document.getElementById("fCpf");
-const fName = () => document.getElementById("fName");
+const fCpf   = () => document.getElementById("fCpf");
+const fName  = () => document.getElementById("fName");
 const fPlate = () => document.getElementById("fPlate");
-const fPass = () => document.getElementById("fPass");
+const fPass  = () => document.getElementById("fPass");
 
-let token = localStorage.getItem("admin_token") || "";
-let map = null;
-let markers = {};
+let token   = localStorage.getItem("admin_token") || "";
+let map     = null;
 let cluster = null;
+let markers = {};
 
 window.addEventListener("load", () => {
-  window.emailEl = document.getElementById("email");
-  window.passEl = document.getElementById("password");
-  window.btnLogin = document.getElementById("btnLogin");
-  window.msgEl = document.getElementById("msg");
+  window.emailEl   = document.getElementById("email");
+  window.passEl    = document.getElementById("password");
+  window.btnLogin  = document.getElementById("btnLogin");
+  window.msgEl     = document.getElementById("msg");
 
-  window.loginDiv = document.getElementById("login");
-  window.panelDiv = document.getElementById("panel");
+  window.loginDiv  = document.getElementById("login");
+  window.panelDiv  = document.getElementById("panel");
   window.btnLogout = document.getElementById("btnLogout");
 
   window.btnCreate = document.getElementById("btnCreate");
   window.msgCreate = document.getElementById("msgCreate");
 
-  window.driversEl = document.getElementById("drivers");
+  window.driversEl  = document.getElementById("drivers");
   window.vehiclesEl = document.getElementById("vehicles");
+  window.countEl    = document.getElementById("count");
+  window.clockEl    = document.getElementById("clock");
 
-  window.countEl = document.getElementById("count");
-  window.clockEl = document.getElementById("clock");
+  btnLogin.onclick  = doLogin;
+  btnLogout.onclick = doLogout;
+  btnCreate.onclick = createDriver;
 
-  btnLogin.addEventListener("click", doLogin);
-  btnLogout.addEventListener("click", doLogout);
-  btnCreate.addEventListener("click", createDriver);
+  if (token) showPanel();
+  else showLogin();
 
-  if (token) {
-    showPanel();
-  } else {
-    showLogin();
-  }
+  initMap();
+});
 
-  // Inicializa mapa depois que DOM está visível
-  setTimeout(() => {
-    map = L.map("map").setView([-27.6, -48.5], 7);
+/* ================= MAPA ================= */
 
-    cluster = L.markerClusterGroup();
+function initMap() {
+  map = L.map("map", {
+    center: [-27.6, -48.5],
+    zoom: 7,
+    maxZoom: 19
+  });
+
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    maxZoom: 19
+  }).addTo(map);
+
+  cluster = L.markerClusterGroup();
   map.addLayer(cluster);
+}
 
-
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      maxZoom: 19
-    }).addTo(map);
-  }, 300);
-}); // <<< FECHAMENTO CORRETO DO window.load
+/* ================= UI ================= */
 
 function showLogin() {
   loginDiv.style.display = "block";
@@ -85,24 +88,19 @@ function showPanel() {
   loginDiv.style.display = "none";
   panelDiv.style.display = "block";
 
-  setTimeout(() => {
-    if (map) map.invalidateSize();
-  }, 300);
+  setTimeout(() => map.invalidateSize(), 300);
 
   loadDrivers();
   startStream();
 }
 
+/* ================= AUTH ================= */
+
 async function doLogin() {
   msgEl.innerText = "";
 
-  const email = (emailEl.value || "").trim();
-  const password = (passEl.value || "").trim();
-
-  if (!email || !password) {
-    msgEl.innerText = "Informe email e senha.";
-    return;
-  }
+  const email = emailEl.value.trim();
+  const password = passEl.value.trim();
 
   try {
     const r = await fetch(API + "/admin/login", {
@@ -114,40 +112,35 @@ async function doLogin() {
     const data = await r.json();
 
     if (!r.ok) {
-      msgEl.innerText = data.error || "Erro no login.";
+      msgEl.innerText = data.error;
       return;
     }
 
     token = data.token;
     localStorage.setItem("admin_token", token);
-
     showPanel();
-  } catch (e) {
-    msgEl.innerText = "Falha de rede.";
+
+  } catch {
+    msgEl.innerText = "Erro de rede";
   }
 }
 
 function doLogout() {
-  token = "";
   localStorage.removeItem("admin_token");
-  showLogin();
+  token = "";
+  location.reload();
 }
 
+/* ================= DRIVERS ================= */
+
 async function createDriver() {
-  msgCreate.innerText = "";
-
-  const cpf = (fCpf().value || "").trim();
-  const name = (fName().value || "").trim();
-  const plate = (fPlate().value || "").trim();
-  const password = (fPass().value || "").trim();
-
-  if (!cpf || !name || !plate || !password) {
-    msgCreate.innerText = "Preencha CPF, nome, placa e senha.";
-    return;
-  }
+  const cpf  = fCpf().value.trim();
+  const name = fName().value.trim();
+  const plate = fPlate().value.trim();
+  const password = fPass().value.trim();
 
   try {
-    const r = await fetch(API + "/admin/drivers", {
+    await fetch(API + "/admin/drivers", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -156,76 +149,60 @@ async function createDriver() {
       body: JSON.stringify({ cpf, name, plate, password })
     });
 
-    const data = await r.json();
-
-    if (!r.ok) {
-      msgCreate.innerText = data.error || "Erro ao cadastrar.";
-      return;
-    }
-
     fCpf().value = "";
     fName().value = "";
     fPlate().value = "";
     fPass().value = "";
 
-    msgCreate.innerText = "Motorista cadastrado.";
     loadDrivers();
-  } catch (e) {
-    msgCreate.innerText = "Falha de rede.";
-  }
+  } catch {}
 }
 
 async function loadDrivers() {
-  try {
-    const r = await fetch(API + "/admin/drivers", {
-      headers: { "Authorization": "Bearer " + token }
-    });
-    const data = await r.json();
+  const r = await fetch(API + "/admin/drivers", {
+    headers: { Authorization: "Bearer " + token }
+  });
 
-    driversEl.innerHTML = "";
-    (data.drivers || []).forEach(d => {
-      const div = document.createElement("div");
-      div.className = "driver";
-      div.innerHTML = `
-        <b>${d.name}</b><br>
-        ${d.cpf}<br>
-        ${d.plate}<br>
-        <button onclick="deleteDriver('${d.id}')">Excluir</button>
-      `;
-      driversEl.appendChild(div);
-    });
-  } catch (e) {}
+  const data = await r.json();
+  driversEl.innerHTML = "";
+
+  data.drivers.forEach(d => {
+    const div = document.createElement("div");
+    div.className = "driver";
+    div.innerHTML = `
+      <b>${d.name}</b><br>
+      ${d.cpf}<br>
+      ${d.plate}<br>
+      <button onclick="deleteDriver('${d.id}')">Excluir</button>
+    `;
+    driversEl.appendChild(div);
+  });
 }
 
-function startStream() {
-  const ev = new EventSource(API + "/admin/stream?token=" + encodeURIComponent(token));
+/* ================= TRACKING ================= */
 
-  ev.addEventListener("live", (e) => {
+function startStream() {
+  const ev = new EventSource(API + "/admin/stream?token=" + token);
+
+  ev.addEventListener("live", e => {
     const data = JSON.parse(e.data);
 
-    vehiclesEl.innerHTML = "";
     countEl.innerText = data.live.len;
+    vehiclesEl.innerHTML = "";
 
-    (data.live.rows || []).forEach(v => {
+    data.live.rows.forEach(v => {
       const key = v.plate;
-      const latlng = [v.lat, v.lng];
+      const pos = [v.lat, v.lng];
 
       if (!markers[key]) {
-        const m = L.marker(latlng, {
+        const m = L.marker(pos, {
           icon: trimbleIcon(v.plate, v.heading, v.speed)
         });
-
-        if (cluster && map) {
-          cluster.addLayer(m);
-        }
-
+        cluster.addLayer(m);
         markers[key] = m;
-        if (cluster && map) cluster.addLayer(m);
-
       } else {
-        markers[key].setLatLng(latlng);
+        markers[key].setLatLng(pos);
         markers[key].setIcon(trimbleIcon(v.plate, v.heading, v.speed));
-
       }
     });
 
@@ -233,26 +210,12 @@ function startStream() {
   });
 }
 
+/* ================= DELETE ================= */
+
 async function deleteDriver(id) {
-  if (!confirm("Deseja excluir este motorista? Todo o histórico será apagado.")) return;
-
-  try {
-    const r = await fetch(API + "/admin/drivers/" + id, {
-      method: "DELETE",
-      headers: {
-        "Authorization": "Bearer " + token
-      }
-    });
-
-    const data = await r.json();
-
-    if (!r.ok) {
-      alert(data.error || "Erro ao excluir");
-      return;
-    }
-
-    loadDrivers();
-  } catch (e) {
-    alert("Falha de rede");
-  }
+  await fetch(API + "/admin/drivers/" + id, {
+    method: "DELETE",
+    headers: { Authorization: "Bearer " + token }
+  });
+  loadDrivers();
 }
