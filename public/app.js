@@ -67,7 +67,7 @@ window.addEventListener("load", () => {
 
   map = L.map("map").setView([-27.6, -48.5], 7);
 
-  cluster = L.markerClusterGroup({
+cluster = L.markerClusterGroup({
   iconCreateFunction: function(c) {
     return L.divIcon({
       html: `<div class="trimble-cluster">${c.getChildCount()}</div>`,
@@ -78,6 +78,8 @@ window.addEventListener("load", () => {
 });
 
 map.addLayer(cluster);
+
+
 
 
   L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
