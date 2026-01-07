@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+<meta charset="UTF-8">
+<title>Moove TK</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="style.css">
+</head>
+<body class="tk-body">
+
+<div class="tk-wrap">
+
+  <div class="tk-card" id="tk-login">
+    <div class="tk-brand">
+      <div class="tk-brand-mark">MT</div>
+      <div class="tk-brand-text">
+        <div class="tk-brand-title">Moove TK</div>
+        <div class="tk-brand-sub">Rastreamento por celular</div>
+      </div>
+    </div>
+
+    <div class="tk-form">
+      <label class="tk-label">CPF</label>
+      <input id="tk-cpf" class="tk-input" placeholder="000.000.000-00" autocomplete="username">
+
+      <label class="tk-label">Senha</label>
+      <input id="tk-pass" class="tk-input" type="password" placeholder="Sua senha" autocomplete="current-password">
+
+      <button id="tk-btn-login" class="tk-btn tk-btn-primary">Entrar</button>
+
+      <div id="tk-login-msg" class="tk-msg"></div>
+    </div>
+  </div>
+
+  <div class="tk-card" id="tk-panel" style="display:none;">
+    <div class="tk-top">
+      <div class="tk-user">
+        <div class="tk-user-name" id="tk-name">—</div>
+        <div class="tk-user-meta">
+          <span id="tk-cpf-view">—</span> · <span id="tk-plate">—</span>
+        </div>
+      </div>
+      <button id="tk-btn-logout" class="tk-btn tk-btn-ghost">Sair</button>
+    </div>
+
+    <div class="tk-status">
+      <div class="tk-pill" id="tk-state">Parado</div>
+      <div class="tk-small" id="tk-last">Sem leituras</div>
+    </div>
+
+    <div class="tk-actions">
+      <button id="tk-btn-start" class="tk-btn tk-btn-success">Iniciar viagem</button>
+      <button id="tk-btn-stop" class="tk-btn tk-btn-danger" disabled>Finalizar viagem</button>
+    </div>
+
+    <div class="tk-info">
+      <div class="tk-row"><b>Viagem:</b> <span id="tk-trip">—</span></div>
+      <div class="tk-row"><b>Enviados:</b> <span id="tk-sent">0</span></div>
+      <div class="tk-row"><b>Pendentes (offline):</b> <span id="tk-pending">0</span></div>
+      <div class="tk-row"><b>Precisão:</b> <span id="tk-acc">—</span></div>
+      <div class="tk-row"><b>Velocidade:</b> <span id="tk-speed">—</span></div>
+    </div>
+
+    <div id="tk-msg" class="tk-msg"></div>
+  </div>
+
+</div>
+
+<script src="tk.js"></script>
+</body>
+</html>
