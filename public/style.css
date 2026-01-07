@@ -220,3 +220,23 @@ button:hover {
   white-space: nowrap;
   text-align: center;
 }
+
+
+
+
+
+
+.plate-badge {
+  background: linear-gradient(180deg, #0b1f3a, #071427);
+  color: #ffffff;
+  padding: 6px 10px;
+  border-radius: 8px;
+  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: 0.5px;
+  border: 1px solid rgba(0,153,255,0.6);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.6);
+  text-align: center;
+  white-space: nowrap;
+}
+
