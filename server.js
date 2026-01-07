@@ -14,34 +14,19 @@ const { q } = require("./db");
 
 const app = express();
 
+const JWT_SECRET = process.env.JWT_SECRET || "dev-secret";
+const PORT = process.env.PORT || 3000;
 
-const gpsRoutes = require("./gps.js");
-
-app.use(express.json());
-app.use(gpsRoutes);
-
-
-app.use(express.static(path.join(__dirname, "public")));
+app.use(cors());
 app.use(express.json({ limit: "1mb" }));
 
-const CORS_ORIGIN = process.env.CORS_ORIGIN || "*";
-app.use(cors({
-  origin: true,
-  credentials: true
-}));
+// static
+app.use(express.static(path.join(__dirname, "public")));
 
-app.use((req, res, next) => {
-  res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Headers", "*");
-  res.setHeader("Access-Control-Allow-Methods", "*");
-  next();
-});
+app.get("/", (req, res) => res.send("MoovTK OK"));
+app.get("/health", (req, res) => res.json({ ok: true, ts: Date.now() }));
 
-
-const PORT = process.env.PORT || 10000;
-const JWT_SECRET = process.env.JWT_SECRET || "change-me";
-
-function signToken(payload, expiresIn) {
+function signToken(payload, expiresIn = "7d") {
   return jwt.sign(payload, JWT_SECRET, { expiresIn });
 }
 
@@ -49,6 +34,7 @@ function authDriver(req, res, next) {
   const h = req.headers.authorization || "";
   const token = h.startsWith("Bearer ") ? h.slice(7) : "";
   if (!token) return res.status(401).json({ error: "Token ausente." });
+
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
     if (decoded.type !== "driver") return res.status(403).json({ error: "Token inválido." });
@@ -76,93 +62,66 @@ function authAdmin(req, res, next) {
   }
 }
 
-async function ensureSchema() {
-  const schemaPath = path.join(__dirname, "schema.sql");
-  const sql = fs.readFileSync(schemaPath, "utf8");
-  await q(sql);
-}
-
-async function ensureBootstrapAdmin() {
-  const email = (process.env.ADMIN_BOOTSTRAP_EMAIL || "").trim().toLowerCase();
-  const pass = (process.env.ADMIN_BOOTSTRAP_PASSWORD || "").trim();
-
-  if (!email || !pass) {
-    console.log("BOOTSTRAP ADMIN não configurado (ADMIN_BOOTSTRAP_EMAIL/PASSWORD).");
-    return;
-  }
-
-  const exists = await q("SELECT id FROM admins WHERE email=$1", [email]);
-  if (exists.rowCount > 0) return;
-
-  const hash = await bcrypt.hash(pass, 10);
-  await q("INSERT INTO admins (email, password_hash) VALUES ($1,$2)", [email, hash]);
-  console.log("Admin bootstrap criado:", email);
-}
-
-app.get("/", (req, res) => res.json({ ok: true, name: "Moove Tracking API" }));
-app.get("/health", (req, res) => res.json({ ok: true }));
-
 // =========================
-// ADMIN AUTH
+// ADMIN LOGIN
 // =========================
 app.post("/admin/login", async (req, res) => {
   try {
     const { email, password } = req.body || {};
-    const e = (email || "").trim().toLowerCase();
-    const p = (password || "").trim();
+    const em = (email || "").trim().toLowerCase();
+    const pass = (password || "").trim();
 
-    if (!e || !p) return res.status(400).json({ error: "Email e senha obrigatórios." });
+    if (!em || !pass) return res.status(400).json({ error: "Email e senha obrigatórios." });
 
-    const r = await q("SELECT id, email, password_hash FROM admins WHERE email=$1", [e]);
+    const r = await q("SELECT id, email, password_hash FROM admins WHERE email=$1", [em]);
     if (r.rowCount === 0) return res.status(401).json({ error: "Credenciais inválidas." });
 
-    const ok = await bcrypt.compare(p, r.rows[0].password_hash);
+    const ok = bcrypt.compareSync(pass, r.rows[0].password_hash);
     if (!ok) return res.status(401).json({ error: "Credenciais inválidas." });
 
     const token = signToken({ type: "admin", admin_id: r.rows[0].id, email: r.rows[0].email }, "30d");
-    res.json({ token });
+
+    res.json({ token, admin: { id: r.rows[0].id, email: r.rows[0].email } });
   } catch (e) {
     res.status(500).json({ error: "Erro interno." });
   }
 });
 
 // =========================
-// ADMIN CRUD DRIVERS
+// ADMIN CREATE DRIVER
 // =========================
 app.post("/admin/drivers", authAdmin, async (req, res) => {
   try {
-    const { cpf, phone, name, plate, password } = req.body || {};
+    const { cpf, name, plate, password, phone } = req.body || {};
+    const c = (cpf || "").trim();
+    const n = (name || "").trim();
+    const p = (plate || "").trim().toUpperCase();
+    const pass = (password || "").trim();
+    const ph = (phone || "").trim();
 
-    const CPF = (cpf || "").trim();
-    const PHONE = (phone || "").trim() || null;
-    const NAME = (name || "").trim();
-    const PLATE = (plate || "").trim().toUpperCase();
-    const PASS = (password || "").trim();
+    if (!c || !n || !p || !pass) return res.status(400).json({ error: "CPF, nome, placa e senha são obrigatórios." });
 
-    if (!CPF || !NAME || !PLATE || !PASS) {
-      return res.status(400).json({ error: "cpf, name, plate, password são obrigatórios." });
-    }
-
-    const hash = await bcrypt.hash(PASS, 10);
+    const hash = bcrypt.hashSync(pass, 10);
 
     const r = await q(
-      "INSERT INTO drivers (cpf, phone, name, plate, password_hash) VALUES ($1,$2,$3,$4,$5) RETURNING id, cpf, phone, name, plate, is_active, created_at",
-      [CPF, PHONE, NAME, PLATE, hash]
+      "INSERT INTO drivers (cpf, phone, name, plate, password_hash) VALUES ($1,$2,$3,$4,$5) RETURNING id, cpf, phone, name, plate, created_at",
+      [c, ph || null, n, p, hash]
     );
 
     res.json({ driver: r.rows[0] });
   } catch (e) {
-    if ((e.message || "").includes("duplicate key")) {
-      return res.status(409).json({ error: "CPF já existe." });
-    }
+    if ((e && e.code) === "23505") return res.status(409).json({ error: "CPF já cadastrado." });
     res.status(500).json({ error: "Erro interno." });
   }
 });
 
+// =========================
+// ADMIN LIST DRIVERS
+// =========================
 app.get("/admin/drivers", authAdmin, async (req, res) => {
   try {
     const r = await q(
-      "SELECT id, cpf, phone, name, plate, is_active, created_at FROM drivers ORDER BY created_at DESC",
+      "SELECT id, cpf, phone, name, plate, created_at FROM drivers ORDER BY created_at DESC",
       []
     );
     res.json({ drivers: r.rows });
@@ -171,34 +130,16 @@ app.get("/admin/drivers", authAdmin, async (req, res) => {
   }
 });
 
-app.patch("/admin/drivers/:id", authAdmin, async (req, res) => {
+// =========================
+// DRIVER LOOKUP (PUBLIC)
+// =========================
+app.post("/driver/lookup", async (req, res) => {
   try {
-    const id = req.params.id;
-    const { phone, name, plate, password, is_active } = req.body || {};
+    const { cpf } = req.body || {};
+    const c = (cpf || "").trim();
+    if (!c) return res.status(400).json({ error: "CPF obrigatório." });
 
-    const updates = [];
-    const vals = [];
-    let i = 1;
-
-    if (phone !== undefined) { updates.push(`phone=$${i++}`); vals.push((phone || "").trim() || null); }
-    if (name !== undefined) { updates.push(`name=$${i++}`); vals.push((name || "").trim()); }
-    if (plate !== undefined) { updates.push(`plate=$${i++}`); vals.push((plate || "").trim().toUpperCase()); }
-    if (is_active !== undefined) { updates.push(`is_active=$${i++}`); vals.push(!!is_active); }
-
-    if (password !== undefined && (password || "").trim()) {
-      const hash = await bcrypt.hash((password || "").trim(), 10);
-      updates.push(`password_hash=$${i++}`);
-      vals.push(hash);
-    }
-
-    if (updates.length === 0) return res.status(400).json({ error: "Nada para atualizar." });
-
-    vals.push(id);
-    const r = await q(
-      `UPDATE drivers SET ${updates.join(", ")} WHERE id=$${i} RETURNING id, cpf, phone, name, plate, is_active, created_at`,
-      vals
-    );
-
+    const r = await q("SELECT id, cpf, name, plate FROM drivers WHERE cpf=$1", [c]);
     if (r.rowCount === 0) return res.status(404).json({ error: "Motorista não encontrado." });
     res.json({ driver: r.rows[0] });
   } catch (e) {
@@ -218,13 +159,13 @@ app.post("/driver/login", async (req, res) => {
     if (!cpf || !pass) return res.status(400).json({ error: "CPF e senha obrigatórios." });
 
     const r = await q(
-      "SELECT id, cpf, name, plate, password_hash, is_active FROM drivers WHERE cpf=$1",
+      "SELECT id, cpf, name, plate, password_hash FROM drivers WHERE cpf=$1",
       [cpf]
     );
-    if (r.rowCount === 0) return res.status(401).json({ error: "Credenciais inválidas." });
-    if (!r.rows[0].is_active) return res.status(403).json({ error: "Usuário desativado." });
 
-    const ok = await bcrypt.compare(pass, r.rows[0].password_hash);
+    if (r.rowCount === 0) return res.status(401).json({ error: "Credenciais inválidas." });
+
+    const ok = bcrypt.compareSync(pass, r.rows[0].password_hash);
     if (!ok) return res.status(401).json({ error: "Credenciais inválidas." });
 
     const token = signToken(
@@ -242,7 +183,7 @@ app.post("/driver/login", async (req, res) => {
 });
 
 // =========================
-// TRIP START / FINISH
+// TRIP START
 // =========================
 app.post("/trip/start", authDriver, async (req, res) => {
   try {
@@ -267,10 +208,14 @@ app.post("/trip/start", authDriver, async (req, res) => {
   }
 });
 
+// =========================
+// TRIP FINISH
+// =========================
 app.post("/trip/finish", authDriver, async (req, res) => {
   try {
     const driverId = req.driver.driver_id;
     const { trip_id } = req.body || {};
+    const trip მხრივ = (trip_id || "").trim();
     const tripId = (trip_id || "").trim();
     if (!tripId) return res.status(400).json({ error: "trip_id obrigatório." });
 
@@ -301,16 +246,27 @@ app.post("/position", authDriver, async (req, res) => {
     if (!tripId) return res.status(400).json({ error: "trip_id obrigatório." });
     if (typeof lat !== "number" || typeof lng !== "number") return res.status(400).json({ error: "lat/lng obrigatórios." });
 
-    // valida viagem ativa do próprio motorista
-    const t = await q("SELECT id, plate FROM trips WHERE id=$1 AND driver_id=$2 AND status='active'", [tripId, driverId]);
-    if (t.rowCount === 0) return res.status(403).json({ error: "Viagem inválida ou finalizada." });
+    // valida viagem ativa e pertencimento
+    const tr = await q("SELECT id, plate, status FROM trips WHERE id=$1 AND driver_id=$2", [tripId, driverId]);
+    if (tr.rowCount === 0) return res.status(404).json({ error: "Viagem não encontrada." });
 
-    const plate = t.rows[0].plate || plateFromToken;
-    const TS = typeof ts === "number" ? ts : Date.now();
+    // plate: preferir a da viagem (fonte de verdade), senão do token
+    const plate = tr.rows[0].plate || plateFromToken;
 
     await q(
-      "INSERT INTO positions (trip_id, driver_id, plate, ts, lat, lng, speed, heading, accuracy) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)",
-      [tripId, driverId, plate, TS, lat, lng, speed ?? null, heading ?? null, accuracy ?? null]
+      `INSERT INTO positions (trip_id, driver_id, plate, ts, lat, lng, speed, heading, accuracy)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+      [
+        tripId,
+        driverId,
+        plate,
+        typeof ts === "number" ? ts : Date.now(),
+        lat,
+        lng,
+        (typeof speed === "number" ? speed : null),
+        (typeof heading === "number" ? heading : null),
+        (typeof accuracy === "number" ? accuracy : null)
+      ]
     );
 
     res.json({ ok: true });
@@ -320,43 +276,31 @@ app.post("/position", authDriver, async (req, res) => {
 });
 
 // =========================
-// ADMIN DASHBOARD ENDPOINTS
+// ADMIN OVERVIEW (counts)
 // =========================
 app.get("/admin/overview", authAdmin, async (req, res) => {
   try {
-    const activeTrips = await q("SELECT COUNT(*)::int AS n FROM trips WHERE status='active'", []);
-    const drivers = await q("SELECT COUNT(*)::int AS n FROM drivers WHERE is_active=true", []);
-    res.json({
-      active_trips: activeTrips.rows[0].n,
-      active_drivers: drivers.rows[0].n
-    });
+    const drivers = await q("SELECT COUNT(*)::int AS c FROM drivers", []);
+    const activeTrips = await q("SELECT COUNT(*)::int AS c FROM trips WHERE status='active'", []);
+    res.json({ drivers: drivers.rows[0].c, activeTrips: activeTrips.rows[0].c });
   } catch (e) {
     res.status(500).json({ error: "Erro interno." });
   }
 });
 
+// =========================
+// ADMIN TRIPS
+// =========================
 app.get("/admin/trips", authAdmin, async (req, res) => {
   try {
-    const status = (req.query.status || "").toString().trim();
-    const where = status ? "WHERE t.status=$1" : "";
-    const params = status ? [status] : [];
+    const limit = Math.min(parseInt(req.query.limit || "100", 10) || 100, 500);
     const r = await q(
-      `
-      SELECT
-        t.id,
-        t.status,
-        t.start_at,
-        t.finish_at,
-        t.plate,
-        d.name as driver_name,
-        d.cpf as driver_cpf
-      FROM trips t
-      JOIN drivers d ON d.id = t.driver_id
-      ${where}
-      ORDER BY t.created_at DESC
-      LIMIT 200
-      `,
-      params
+      `SELECT t.id, t.plate, t.status, t.start_at, t.finish_at, d.name, d.cpf
+       FROM trips t
+       JOIN drivers d ON d.id=t.driver_id
+       ORDER BY t.start_at DESC
+       LIMIT $1`,
+      [limit]
     );
     res.json({ trips: r.rows });
   } catch (e) {
@@ -364,43 +308,22 @@ app.get("/admin/trips", authAdmin, async (req, res) => {
   }
 });
 
-// “Mapa em tempo real”: retorna a última posição de cada viagem ativa (para plotar no mapa)
+// =========================
+// ADMIN LIVE
+// =========================
 app.get("/admin/live", authAdmin, async (req, res) => {
   try {
+    // últimas posições por placa (somente trips ativas)
     const r = await q(
       `
-      WITH lastpos AS (
-        SELECT DISTINCT ON (p.trip_id)
-          p.trip_id,
-          p.plate,
-          p.lat,
-          p.lng,
-          p.speed,
-          p.heading,
-          p.accuracy,
-          p.ts,
-          p.created_at
-        FROM positions p
-        ORDER BY p.trip_id, p.created_at DESC
-      )
-      SELECT
-        t.id as trip_id,
-        t.plate,
-        t.start_at,
-        d.name as driver_name,
-        d.cpf as driver_cpf,
-        lp.lat,
-        lp.lng,
-        lp.speed,
-        lp.heading,
-        lp.accuracy,
-        lp.ts,
-        lp.created_at as last_seen
-      FROM trips t
-      JOIN drivers d ON d.id = t.driver_id
-      LEFT JOIN lastpos lp ON lp.trip_id = t.id
+      SELECT DISTINCT ON (p.plate)
+        p.plate, p.trip_id, p.ts, p.lat, p.lng, p.speed, p.heading, p.accuracy,
+        d.name, d.cpf
+      FROM positions p
+      JOIN trips t ON t.id=p.trip_id
+      JOIN drivers d ON d.id=p.driver_id
       WHERE t.status='active'
-      ORDER BY t.start_at DESC
+      ORDER BY p.plate, p.created_at DESC
       `,
       []
     );
@@ -411,79 +334,60 @@ app.get("/admin/live", authAdmin, async (req, res) => {
   }
 });
 
-// SSE simples para “quase tempo real” sem WebSocket (o painel pode usar EventSource)
+// =========================
+// ADMIN STREAM (SSE)
+// =========================
 app.get("/admin/stream", authAdmin, async (req, res) => {
   res.setHeader("Content-Type", "text/event-stream");
   res.setHeader("Cache-Control", "no-cache");
   res.setHeader("Connection", "keep-alive");
+  res.flushHeaders?.();
 
   let alive = true;
   req.on("close", () => { alive = false; });
 
-  const send = async () => {
-    if (!alive) return;
+  const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
+  while (alive) {
     try {
-      const r = await q(
+      const live = await q(
         `
-        WITH lastpos AS (
-          SELECT DISTINCT ON (p.trip_id)
-            p.trip_id, p.plate, p.lat, p.lng, p.speed, p.heading, p.accuracy, p.ts, p.created_at
-          FROM positions p
-          ORDER BY p.trip_id, p.created_at DESC
-        )
-        SELECT
-          t.id as trip_id,
-          t.plate,
-          d.name as driver_name,
-          d.cpf as driver_cpf,
-          lp.lat,
-          lp.lng,
-          lp.speed,
-          lp.heading,
-          lp.accuracy,
-          lp.ts,
-          lp.created_at as last_seen
-        FROM trips t
-        JOIN drivers d ON d.id = t.driver_id
-        LEFT JOIN lastpos lp ON lp.trip_id = t.id
+        SELECT DISTINCT ON (p.plate)
+          p.plate, p.trip_id, p.ts, p.lat, p.lng, p.speed, p.heading, p.accuracy,
+          d.name, d.cpf
+        FROM positions p
+        JOIN trips t ON t.id=p.trip_id
+        JOIN drivers d ON d.id=p.driver_id
         WHERE t.status='active'
-        ORDER BY t.start_at DESC
+        ORDER BY p.plate, p.created_at DESC
         `,
         []
       );
 
+      const payload = {
+        ts: Date.now(),
+        live: { len: live.rowCount, rows: live.rows }
+      };
+
       res.write(`event: live\n`);
-      res.write(`data: ${JSON.stringify({ live: r.rows, now: Date.now() })}\n\n`);
+      res.write(`data: ${JSON.stringify(payload)}\n\n`);
     } catch (e) {
-      res.write(`event: error\n`);
-      res.write(`data: ${JSON.stringify({ error: "stream_error" })}\n\n`);
+      res.write(`event: live\n`);
+      res.write(`data: ${JSON.stringify({ ts: Date.now(), live: { len: 0, rows: [] } })}\n\n`);
     }
 
-    setTimeout(send, 5000); // a cada 5s
-  };
-
-  send();
+    await sleep(2000);
+  }
 });
 
 app.get("/app", (req, res) => {
-  res.sendFile(path.join(__dirname, "public", "index.html"));
+  res.sendFile(path.join(__dirname, "public", "tk.html"));
 });
 
+app.get("/tk", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "tk.html"));
+});
 
-// =========================
-// BOOT
-// =========================
-(async () => {
-  try {
-    await ensureSchema();
-    await ensureBootstrapAdmin();
-
-    app.listen(PORT, () => {
-      console.log("Moove Tracking API rodando na porta:", PORT);
-    });
-  } catch (e) {
-    console.error("Falha ao iniciar:", e);
-    process.exit(1);
-  }
-})();
+app.listen(PORT, () => {
+  console.log("MoovTK running on port", PORT);
+});
