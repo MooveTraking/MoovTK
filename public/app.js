@@ -191,8 +191,19 @@ function startStream() {
     vehiclesEl.innerHTML = "";
 
     data.live.rows.forEach(v => {
+
+      const div = document.createElement("div");
+      div.className = "vehicle";
+      div.innerHTML = `
+        <b>${v.plate}</b><br>
+        ${v.name || ""}<br>
+        ${new Date(v.ts).toLocaleTimeString()}
+      `;
+      vehiclesEl.appendChild(div);
+
       const key = v.plate;
       const pos = [v.lat, v.lng];
+
 
       if (!markers[key]) {
         const m = L.marker(pos, {
