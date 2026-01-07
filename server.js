@@ -422,3 +422,75 @@ app.get("/tk", (req, res) => {
 app.listen(PORT, () => {
   console.log("MoovTK running on port", PORT);
 });
+
+
+
+
+// =========================
+// ADMIN TRIP HISTORY
+// =========================
+app.get("/admin/trips/:tripId/history", authAdmin, async (req, res) => {
+  try {
+    const { tripId } = req.params;
+
+    const trip = await q(`
+      SELECT t.id, t.plate, t.start_at, t.finish_at, d.name, d.cpf
+      FROM trips t
+      JOIN drivers d ON d.id = t.driver_id
+      WHERE t.id = $1
+    `, [tripId]);
+
+    if (trip.rowCount === 0) {
+      return res.status(404).json({ error: "Viagem não encontrada" });
+    }
+
+    const points = await q(`
+      SELECT ts, lat, lng, speed, heading, accuracy
+      FROM positions
+      WHERE trip_id = $1
+      ORDER BY ts ASC
+    `, [tripId]);
+
+    res.json({
+      trip: trip.rows[0],
+      points: points.rows
+    });
+
+  } catch (e) {
+    res.status(500).json({ error: "Erro ao carregar histórico" });
+  }
+});
+
+
+
+
+
+
+// =========================
+// ADMIN TRIPS BY DATE
+// =========================
+app.get("/admin/trips-by-date", authAdmin, async (req, res) => {
+  try {
+    const { date } = req.query; // formato YYYY-MM-DD
+
+    const r = await q(`
+      SELECT t.id, t.plate, t.start_at, t.finish_at, d.name
+      FROM trips t
+      JOIN drivers d ON d.id = t.driver_id
+      WHERE DATE(t.start_at) = $1
+      ORDER BY t.start_at DESC
+    `, [date]);
+
+    res.json({ trips: r.rows });
+
+  } catch (e) {
+    res.status(500).json({ error: "Erro ao buscar viagens" });
+  }
+});
+
+
+
+
+
+
+
