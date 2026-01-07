@@ -2,6 +2,28 @@ const API = "https://moovtk.onrender.com";
 
 console.log("APP LOADED");
 
+function trimbleIcon(plate, heading, speed) {
+  const rot = typeof heading === "number" ? heading : 0;
+  const moving = (speed || 0) > 2;
+
+  return L.divIcon({
+    className: "",
+    html: `
+      <div class="trimble-marker">
+        <div class="trimble-dot">
+          <svg viewBox="0 0 24 24">
+            <path d="M5 16l1.5-4.5h11L19 16H5zm2-6h10l-1-4H8l-1 4z"/>
+          </svg>
+        </div>
+        ${moving ? `<div class="trimble-arrow" style="transform:rotate(${rot}deg)"></div>` : ""}
+        <div class="trimble-plate">${plate}</div>
+      </div>
+    `,
+    iconSize: null
+  });
+}
+
+
 const fCpf = () => document.getElementById("fCpf");
 const fName = () => document.getElementById("fName");
 const fPlate = () => document.getElementById("fPlate");
@@ -11,6 +33,8 @@ const fPass = () => document.getElementById("fPass");
 let token = localStorage.getItem("admin_token") || "";
 let map = null;
 let markers = {};
+let cluster = null;
+
 
 window.addEventListener("load", () => {
   window.emailEl = document.getElementById("email");
@@ -42,6 +66,19 @@ window.addEventListener("load", () => {
   }
 
   map = L.map("map").setView([-27.6, -48.5], 7);
+
+  cluster = L.markerClusterGroup({
+  iconCreateFunction: function(c) {
+    return L.divIcon({
+      html: `<div class="trimble-cluster">${c.getChildCount()}</div>`,
+      className: "",
+      iconSize: [44,44]
+    });
+  }
+});
+
+map.addLayer(cluster);
+
 
   L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
     maxZoom: 19
@@ -185,17 +222,17 @@ function startStream() {
       const latlng = [v.lat, v.lng];
 
       if (!markers[key]) {
-        const icon = L.divIcon({
-          className: "plate-marker",
-          html: `<div class="plate-badge">${key}</div>`,
-          iconSize: [80, 28],
-          iconAnchor: [40, 14]
+        const m = L.marker(latlng, {
+          icon: trimbleIcon(v.plate, v.heading, v.speed)
         });
 
-        markers[key] = L.marker(latlng, { icon }).addTo(map);
+        cluster.addLayer(m);
+        markers[key] = m;
       } else {
         markers[key].setLatLng(latlng);
+        markers[key].setIcon(trimbleIcon(v.plate, v.heading, v.speed));
       }
+
 
 
     });
