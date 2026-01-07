@@ -1,38 +1,17 @@
 const { Pool } = require("pg");
 
-if (!process.env.DATABASE_URL) {
-  throw new Error("DATABASE_URL não definido nas Environment Variables do Render.");
-}
-
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: process.env.DATABASE_URL.includes("render.com")
-    ? { rejectUnauthorized: false }
-    : undefined
+  ssl: process.env.PGSSLMODE === "disable" ? false : { rejectUnauthorized: false }
 });
 
 async function q(text, params) {
-  return pool.query(text, params);
+  const client = await pool.connect();
+  try {
+    return await client.query(text, params);
+  } finally {
+    client.release();
+  }
 }
-
-async function initDB() {
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS gps_logs (
-      id SERIAL PRIMARY KEY,
-      device_id TEXT,
-      trip_id TEXT,
-      latitude DOUBLE PRECISION,
-      longitude DOUBLE PRECISION,
-      speed DOUBLE PRECISION,
-      accuracy DOUBLE PRECISION,
-      battery INTEGER,
-      created_at TIMESTAMP DEFAULT NOW()
-    );
-  `);
-}
-
-initDB().catch(err => {
-  console.error("DB INIT ERROR:", err);
-});
 
 module.exports = { pool, q };
