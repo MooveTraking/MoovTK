@@ -15,25 +15,37 @@
     <h1>Moove Tracking</h1>
     <input id="email" placeholder="Admin Email">
     <input id="password" type="password" placeholder="Senha">
-    <button onclick="login()">Entrar</button>
-    <p id="msg"></p>
+    <button id="btnLogin">Entrar</button>
+    <div id="msg"></div>
   </div>
 </div>
 
-<div id="panel" style="display:none">
-  <div class="sidebar">
-      <button id="btnAdd" class="add-btn">+ Novo Motorista</button>
+<div id="panel" style="display:none;">
+  <div class="topbar">
+    <h2>Moove Tracking</h2>
+    <button id="btnLogout">Sair</button>
+  </div>
 
-   <div id="driverForm" class="form" style="display:none">
+  <div class="grid">
+    <div class="box">
+      <h3>Cadastrar Motorista</h3>
       <input id="fCpf" placeholder="CPF">
       <input id="fName" placeholder="Nome">
       <input id="fPlate" placeholder="Placa">
       <input id="fPass" type="password" placeholder="Senha">
-      <button type="button" id="btnSaveDriver">Salvar</button>
-  </div>
+      <button id="btnCreate">Cadastrar</button>
+      <div id="msgCreate"></div>
+    </div>
 
-    <h2>Veículos Ativos</h2>
-    <div id="vehicles"></div>
+    <div class="box">
+      <h3>Motoristas</h3>
+      <div id="drivers"></div>
+    </div>
+
+    <div class="box">
+      <h3>Em rota</h3>
+      <div id="vehicles"></div>
+    </div>
   </div>
 
   <div id="map"></div>
