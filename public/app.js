@@ -154,7 +154,13 @@ async function loadDrivers() {
     (data.drivers || []).forEach(d => {
       const div = document.createElement("div");
       div.className = "driver";
-      div.innerHTML = `<b>${d.name}</b><br>${d.cpf}<br>${d.plate}`;
+      div.innerHTML = `
+      <b>${d.name}</b><br>
+      ${d.cpf}<br>
+      ${d.plate}<br>
+      <button onclick="deleteDriver('${d.id}')">Excluir</button>
+      `;
+
       driversEl.appendChild(div);
     });
   } catch (e) {}
@@ -187,4 +193,29 @@ function startStream() {
 
     clockEl.innerText = new Date(data.ts).toLocaleTimeString();
   });
+}
+
+
+async function deleteDriver(id) {
+  if (!confirm("Deseja excluir este motorista? Todo o histórico será apagado.")) return;
+
+  try {
+    const r = await fetch(API + "/admin/drivers/" + id, {
+      method: "DELETE",
+      headers: {
+        "Authorization": "Bearer " + token
+      }
+    });
+
+    const data = await r.json();
+
+    if (!r.ok) {
+      alert(data.error || "Erro ao excluir");
+      return;
+    }
+
+    loadDrivers();
+  } catch (e) {
+    alert("Falha de rede");
+  }
 }
