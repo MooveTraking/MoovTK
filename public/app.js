@@ -65,27 +65,25 @@ window.addEventListener("load", () => {
     showLogin();
   }
 
-  map = L.map("map").setView([-27.6, -48.5], 7);
+  setTimeout(() => {
+    map = L.map("map").setView([-27.6, -48.5], 7);
 
-cluster = L.markerClusterGroup({
-  iconCreateFunction: function(c) {
-    return L.divIcon({
-      html: `<div class="trimble-cluster">${c.getChildCount()}</div>`,
-      className: "",
-      iconSize: [44,44]
+    cluster = L.markerClusterGroup({
+      iconCreateFunction: function(c) {
+        return L.divIcon({
+          html: `<div class="trimble-cluster">${c.getChildCount()}</div>`,
+          className: "",
+          iconSize: [44,44]
+        });
+      }
     });
-  }
-});
 
-map.addLayer(cluster);
+    map.addLayer(cluster);
 
-
-
-
-  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-    maxZoom: 19
-  }).addTo(map);
-});
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 19
+    }).addTo(map);
+  }, 300);
 
 function showLogin() {
   loginDiv.style.display = "block";
@@ -97,8 +95,8 @@ function showPanel() {
   panelDiv.style.display = "block";
 
   setTimeout(() => {
-    map.invalidateSize();
-  }, 300);
+    if (map) map.invalidateSize();
+  }, 200);
 
   loadDrivers();
   startStream();
