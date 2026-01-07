@@ -67,12 +67,27 @@ async function ver(id){
   });
   const data = await r.json();
 
-  const pts = data.points.map(p=>[p.lat,p.lng]);
+  const coords = data.points.map(p => `${p.lng},${p.lat}`).join(";");
+
+  // OSRM público
+  const routeResp = await fetch(
+    `https://router.project-osrm.org/match/v1/driving/${coords}?geometries=geojson&overview=full`
+  );
+
+  const routeData = await routeResp.json();
+
+  if (!routeData.matchings || !routeData.matchings[0]) {
+    alert("Não foi possível ajustar rota às ruas.");
+    return;
+  }
+
+  const geo = routeData.matchings[0].geometry.coordinates.map(c => [c[1], c[0]]);
 
   if(line) map.removeLayer(line);
-  line = L.polyline(pts).addTo(map);
+  line = L.polyline(geo, { color: "blue" }).addTo(map);
   map.fitBounds(line.getBounds());
 }
+
 </script>
 
 </body>
