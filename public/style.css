@@ -240,3 +240,64 @@ button:hover {
   white-space: nowrap;
 }
 
+.trimble-marker {
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  transform: translateY(-8px);
+}
+
+.trimble-dot {
+  width:26px;
+  height:26px;
+  background:#0a3cff;
+  border-radius:50%;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  box-shadow:0 4px 12px rgba(0,0,0,.5);
+  border:2px solid rgba(255,255,255,.35);
+}
+
+.trimble-dot svg {
+  width:14px;
+  height:14px;
+  fill:white;
+}
+
+.trimble-arrow {
+  width:0;
+  height:0;
+  border-left:6px solid transparent;
+  border-right:6px solid transparent;
+  border-top:10px solid #0a3cff;
+  margin-top:-2px;
+  transform-origin:center;
+}
+
+.trimble-plate {
+  margin-top:2px;
+  background:linear-gradient(180deg,#0a3cff,#062b9c);
+  color:white;
+  padding:4px 10px;
+  border-radius:6px;
+  font-weight:700;
+  font-size:12px;
+  white-space:nowrap;
+  border:1px solid rgba(255,255,255,.3);
+  box-shadow:0 4px 10px rgba(0,0,0,.4);
+}
+
+.trimble-cluster {
+  background:linear-gradient(180deg,#0a3cff,#062b9c);
+  color:white;
+  border-radius:50%;
+  width:44px;
+  height:44px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-weight:900;
+  border:2px solid rgba(255,255,255,.4);
+  box-shadow:0 4px 12px rgba(0,0,0,.5);
+}
