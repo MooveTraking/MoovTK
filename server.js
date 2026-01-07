@@ -493,4 +493,43 @@ app.get("/admin/trips-by-date", authAdmin, async (req, res) => {
 
 
 
+app.get("/admin/plates", authAdmin, async (req, res) => {
+  const r = await q("SELECT DISTINCT plate FROM drivers ORDER BY plate", []);
+  res.json({ plates: r.rows.map(x => x.plate) });
+});
 
+
+
+
+
+
+app.get("/admin/trips/search", authAdmin, async (req, res) => {
+  const { plate, start, end } = req.query;
+
+  const r = await q(`
+    SELECT id, plate, start_at, finish_at
+    FROM trips
+    WHERE plate = $1
+      AND start_at >= $2
+      AND (finish_at <= $3 OR finish_at IS NULL)
+    ORDER BY start_at
+  `, [plate, start, end]);
+
+  res.json({ trips: r.rows });
+});
+
+
+
+
+
+
+app.get("/admin/trips/:id/positions", authAdmin, async (req, res) => {
+  const r = await q(`
+    SELECT ts, lat, lng
+    FROM positions
+    WHERE trip_id = $1
+    ORDER BY ts
+  `, [req.params.id]);
+
+  res.json({ points: r.rows });
+});
