@@ -215,22 +215,28 @@ app.post("/trip/finish", authDriver, async (req, res) => {
   try {
     const driverId = req.driver.driver_id;
     const { trip_id } = req.body || {};
-    const trip მხრივ = (trip_id || "").trim();
     const tripId = (trip_id || "").trim();
-    if (!tripId) return res.status(400).json({ error: "trip_id obrigatório." });
+
+    if (!tripId) {
+      return res.status(400).json({ error: "trip_id obrigatório." });
+    }
 
     const r = await q(
       "UPDATE trips SET status='finished', finish_at=NOW() WHERE id=$1 AND driver_id=$2 AND status='active' RETURNING id",
       [tripId, driverId]
     );
 
-    if (r.rowCount === 0) return res.status(404).json({ error: "Viagem ativa não encontrada." });
+    if (r.rowCount === 0) {
+      return res.status(404).json({ error: "Viagem ativa não encontrada." });
+    }
 
     res.json({ ok: true });
   } catch (e) {
+    console.error("TRIP FINISH ERROR:", e);
     res.status(500).json({ error: "Erro interno." });
   }
 });
+
 
 // =========================
 // POSITION INGEST
