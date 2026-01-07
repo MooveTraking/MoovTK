@@ -14,7 +14,6 @@ CREATE TABLE IF NOT EXISTS drivers (
   name TEXT NOT NULL,
   plate TEXT NOT NULL,
   password_hash TEXT NOT NULL,
-  is_active BOOLEAN NOT NULL DEFAULT TRUE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -22,14 +21,13 @@ CREATE TABLE IF NOT EXISTS trips (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   driver_id UUID NOT NULL REFERENCES drivers(id) ON DELETE CASCADE,
   plate TEXT NOT NULL,
-  status TEXT NOT NULL DEFAULT 'active', -- active | finished
+  status TEXT NOT NULL CHECK (status IN ('active','finished')),
   start_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  finish_at TIMESTAMPTZ,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  finish_at TIMESTAMPTZ
 );
 
 CREATE TABLE IF NOT EXISTS positions (
-  id BIGSERIAL PRIMARY KEY,
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   trip_id UUID NOT NULL REFERENCES trips(id) ON DELETE CASCADE,
   driver_id UUID NOT NULL REFERENCES drivers(id) ON DELETE CASCADE,
   plate TEXT NOT NULL,
