@@ -2,7 +2,6 @@ require("dotenv").config();
 
 console.log("DEPLOY-ATLAS-FIX-2026");
 
-const fetch = require("node-fetch");
 const fs = require("fs");
 const path = require("path");
 const express = require("express");
