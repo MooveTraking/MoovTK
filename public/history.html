@@ -5,6 +5,27 @@
 <title>Histórico</title>
 <link rel="stylesheet" href="style.css">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+
+
+  
+<style>
+  /* Remove a grade (bordas/outline) dos tiles do Leaflet */
+  .leaflet-container img.leaflet-tile {
+    outline: none !important;
+    border: none !important;
+    box-shadow: none !important;
+  }
+
+  /* Se existir alguma regra global de CSS afetando imagens, isso neutraliza no mapa */
+  .leaflet-container img {
+    outline: none !important;
+    border: none !important;
+  }
+</style>
+
+
+
+  
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 </head>
 <body>
