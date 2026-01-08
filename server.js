@@ -557,7 +557,7 @@ app.get("/admin/trips/:id/positions", authAdmin, async (req, res) => {
     res.json({ points: shape });
 
   } catch (e) {
-    console.error("MATCH ERROR", e);
+    console.error("OSRM ERROR", e);
     res.status(500).json({ error: "map matching failed" });
   }
 });
