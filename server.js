@@ -114,6 +114,22 @@ app.post("/admin/drivers", authAdmin, async (req, res) => {
   }
 });
 
+app.get("/driver/active-trip", authDriver, async (req, res) => {
+  try {
+    const driverId = req.driver.driver_id;
+    const r = await q(
+      "SELECT id FROM trips WHERE driver_id=$1 AND status='active' LIMIT 1",
+      [driverId]
+    );
+    res.json({
+      active: r.rowCount > 0,
+      trip_id: r.rowCount > 0 ? r.rows[0].id : null
+    });
+  } catch (e) {
+    res.json({ active: false, trip_id: null });
+  }
+});
+
 // =========================
 // ADMIN LIST DRIVERS
 // =========================
