@@ -23,8 +23,19 @@
 const API = "https://moovtk.onrender.com";
 const token = localStorage.getItem("admin_token");
 
-let map = L.map("map").setView([-27,-48],7);
-L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(map);
+let map = L.map("map", {
+  zoomControl: true,
+  attributionControl: true,
+  preferCanvas: true
+}).setView([-27, -48], 7);
+L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+  maxZoom: 19,
+  detectRetina: true
+}).addTo(map);
+map.eachLayer(l => {
+  if (l._debug) map.removeLayer(l);
+});
+
 
 let line = null;
 
