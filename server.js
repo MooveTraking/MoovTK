@@ -534,31 +534,66 @@ app.get("/admin/trips/:id/positions", authAdmin, async (req, res) => {
       [id]
     );
 
+    // Se não tem pontos suficientes, devolve cru
     if (r.rowCount < 2) {
       return res.json({ points: r.rows });
     }
 
-    const coords = r.rows.map(p => `${p.lng},${p.lat}`).join(";");
+    // ==============================
+    // OSRM público tem limites. Então:
+    // - reduz pontos (amostragem) pra no máximo 90
+    // - tenta MATCH
+    // - se falhar, devolve pontos crus
+    // ==============================
+    const raw = r.rows;
 
-    const url = `https://router.project-osrm.org/match/v1/driving/${coords}?geometries=geojson&overview=full`;
+    const MAX = 90;
+    let sampled = raw;
 
+    if (raw.length > MAX) {
+      const step = Math.ceil(raw.length / MAX);
+      sampled = raw.filter((_, i) => i % step === 0);
+
+      // garante último ponto
+      const last = raw[raw.length - 1];
+      const last2 = sampled[sampled.length - 1];
+      if (!last2 || last2.lat !== last.lat || last2.lng !== last.lng) {
+        sampled.push(last);
+      }
+    }
+
+    const coords = sampled.map(p => `${p.lng},${p.lat}`).join(";");
+
+    const url =
+      `https://router.project-osrm.org/match/v1/driving/${coords}` +
+      `?geometries=geojson&overview=full&tidy=true`;
+
+    // Node 22 tem fetch global (não precisa node-fetch)
     const resp = await fetch(url);
     const data = await resp.json();
 
     if (!data.matchings || !data.matchings.length) {
-      return res.json({ points: r.rows });
+      // Match falhou -> devolve pontos crus (pelo menos mostra o caminho real entre pontos)
+      return res.json({ points: raw });
     }
 
+    // Converte GeoJSON coords -> [{lat,lng}]
     const shape = data.matchings[0].geometry.coordinates.map(c => ({
       lat: c[1],
       lng: c[0]
     }));
 
-    res.json({ points: shape });
+    // Se shape vier pequeno demais, volta pro cru
+    if (!shape || shape.length < 2) {
+      return res.json({ points: raw });
+    }
+
+    return res.json({ points: shape });
 
   } catch (e) {
     console.error("OSRM ERROR", e);
-    res.status(500).json({ error: "map matching failed" });
+    return res.status(500).json({ error: "map matching failed" });
   }
 });
+
 
