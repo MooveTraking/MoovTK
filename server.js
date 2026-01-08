@@ -544,3 +544,11 @@ app.get("/admin/trips/:id/positions", authAdmin, async (req, res) => {
 });
 
 
+app.post("/admin/emergency_reset", authAdmin, async (req, res) => {
+  try {
+    await q("UPDATE trips SET status='finished', finish_at=NOW() WHERE status='active'", []);
+    res.json({ ok: true, message: "Todas as viagens ativas foram finalizadas." });
+  } catch (e) {
+    res.status(500).json({ error: "Erro no reset" });
+  }
+});
