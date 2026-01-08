@@ -161,6 +161,25 @@ async function startTrip() {
     const token = getToken();
     if (!token) throw new Error("Sessão expirada. Faça login novamente.");
 
+    // VERIFICA SE JÁ TEM VIAGEM ATIVA DESTE MOTORISTA
+    const checkRes = await fetch(API + "/driver/active-trip", {
+      headers: { Authorization: "Bearer " + token }
+    }).catch(() => null);
+    
+    if (checkRes && checkRes.ok) {
+      const checkData = await checkRes.json();
+      if (checkData.active && checkData.trip_id) {
+        const confirmar = confirm("ATENÇÃO: Você já tem uma viagem em andamento. Deseja finalizá-la antes de iniciar nova?");
+        if (confirmar) {
+          await finishTrip();
+        } else {
+          setMsg("Operação cancelada. Finalize a viagem atual primeiro.", true);
+          return;
+        }
+      }
+    }
+
+    // INICIA NOVA VIAGEM
     const data = await apiPost("/trip/start", {}, token);
     setTripId(data.trip_id);
     el("tk-trip").innerText = data.trip_id;
