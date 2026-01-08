@@ -534,56 +534,65 @@ app.get("/admin/trips/:id/positions", authAdmin, async (req, res) => {
       [id]
     );
 
+    // Log para diagnóstico
+    console.log(`[HISTÓRICO] Viagem ${id}: ${r.rowCount} pontos`);
+
     // Se não tem pontos suficientes, devolve cru
     if (r.rowCount < 2) {
       return res.json({ points: r.rows });
     }
 
-    // ==============================
-    // OSRM público tem limites. Então:
-    // - reduz pontos (amostragem) pra no máximo 90
-    // - tenta MATCH
-    // - se falhar, devolve pontos crus
-    // ==============================
     const raw = r.rows;
 
-    const MAX = 90;
+    // AMOSTRAGEM INTELIGENTE PARA O OSRM
+    const MAX_PONTOS_OSRM = 90;
     let sampled = raw;
 
-    if (raw.length > MAX) {
-      const step = Math.ceil(raw.length / MAX);
-      sampled = raw.filter((_, i) => i % step === 0);
-
-      // garante último ponto
-      const last = raw[raw.length - 1];
-      const last2 = sampled[sampled.length - 1];
-      if (!last2 || last2.lat !== last.lat || last2.lng !== last.lng) {
-        sampled.push(last);
+    if (raw.length > MAX_PONTOS_OSRM) {
+      const passo = Math.ceil(raw.length / MAX_PONTOS_OSRM);
+      sampled = [];
+      
+      for (let i = 0; i < raw.length; i += passo) {
+        sampled.push(raw[i]);
+      }
+      
+      // Garante último ponto
+      const ultimo = raw[raw.length - 1];
+      const jaTemUltimo = sampled.some(p => p.lat === ultimo.lat && p.lng === ultimo.lng);
+      if (!jaTemUltimo) {
+        sampled.push(ultimo);
+      }
+      
+      // Garante primeiro ponto
+      const primeiro = raw[0];
+      const jaTemPrimeiro = sampled.some(p => p.lat === primeiro.lat && p.lng === primeiro.lng);
+      if (!jaTemPrimeiro) {
+        sampled.unshift(primeiro);
       }
     }
 
+    // CHAMA O OSRM COM OS PONTOS AMOSTRADOS
     const coords = sampled.map(p => `${p.lng},${p.lat}`).join(";");
 
     const url =
       `https://router.project-osrm.org/match/v1/driving/${coords}` +
       `?geometries=geojson&overview=full&tidy=true`;
 
-    // Node 22 tem fetch global (não precisa node-fetch)
     const resp = await fetch(url);
     const data = await resp.json();
 
     if (!data.matchings || !data.matchings.length) {
-      // Match falhou -> devolve pontos crus (pelo menos mostra o caminho real entre pontos)
+      // Se OSRM falhar, retorna os pontos crus
       return res.json({ points: raw });
     }
 
-    // Converte GeoJSON coords -> [{lat,lng}]
+    // Converte GeoJSON para formato do seu sistema
     const shape = data.matchings[0].geometry.coordinates.map(c => ({
       lat: c[1],
       lng: c[0]
     }));
 
-    // Se shape vier pequeno demais, volta pro cru
+    // Se shape vier vazio, retorna pontos crus
     if (!shape || shape.length < 2) {
       return res.json({ points: raw });
     }
@@ -591,8 +600,16 @@ app.get("/admin/trips/:id/positions", authAdmin, async (req, res) => {
     return res.json({ points: shape });
 
   } catch (e) {
-    console.error("OSRM ERROR", e);
-    return res.status(500).json({ error: "map matching failed" });
+    console.error("[OSRM ERROR]", e.message);
+    // Em caso de erro, retorna os pontos crus
+    const r = await q(
+      `SELECT lat, lng
+       FROM positions
+       WHERE trip_id = $1
+       ORDER BY ts ASC`,
+      [req.params.id]
+    );
+    return res.json({ points: r.rows });
   }
 });
 
